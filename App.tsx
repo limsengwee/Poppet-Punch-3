@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
 import { detectFace } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, PieIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -29,7 +29,7 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
-    { id: 'pie', name: '派拍', icon: PieIcon },
+    { id: 'fistPunch', name: '重拳', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'ribbon', name: '彩带', icon: SparkleIcon },
@@ -47,6 +47,7 @@ const App: React.FC = () => {
   const [dents, setDents] = useState<Dent[]>([]);
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
+  const [bruises, setBruises] = useState<Bruise[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -73,6 +74,7 @@ const App: React.FC = () => {
     setDents([]);
     setSpiders([]);
     setNeedles([]);
+    setBruises([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -93,6 +95,7 @@ const App: React.FC = () => {
     setDents([]);
     setSpiders([]);
     setNeedles([]);
+    setBruises([]);
     setHitCount(0);
   }, []);
 
@@ -235,32 +238,27 @@ const App: React.FC = () => {
         ctx.translate(cx, cy);
         ctx.rotate(needle.rotation);
         
-        // Needle Shaft - drawn first to be "under" the head
-        ctx.strokeStyle = '#a1a1aa'; // A neutral metallic gray
+        ctx.strokeStyle = '#a1a1aa';
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         
-        // Add a shadow for depth
         ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
         ctx.shadowBlur = 3;
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 2;
         
         ctx.beginPath();
-        ctx.moveTo(0, headRadius * 0.8); // Start slightly inside the head
+        ctx.moveTo(0, headRadius * 0.8);
         ctx.lineTo(0, length);
         ctx.stroke();
 
-        // Reset shadows for the glossy head
         ctx.shadowColor = 'transparent';
 
-        // Needle Head (base color)
         ctx.fillStyle = needle.color;
         ctx.beginPath();
         ctx.arc(0, 0, headRadius, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Needle Head (3D Highlight)
         const gradient = ctx.createRadialGradient(
             -headRadius * 0.4, -headRadius * 0.4, 0,
             -headRadius * 0.4, -headRadius * 0.4, headRadius * 1.5
@@ -275,7 +273,59 @@ const App: React.FC = () => {
         ctx.restore();
     });
 
-  }, [dents, spiders, needles]);
+    bruises.forEach(bruise => {
+      const centerX = offsetX + bruise.x * finalWidth;
+      const centerY = offsetY + bruise.y * finalHeight;
+      const radius = bruise.radius * Math.min(finalWidth, finalHeight);
+
+      ctx.save();
+      
+      // --- 1. Draw Bruise Colors with Blending ---
+      // This uses 'multiply' to darken and tint the skin, making it look like an actual bruise under the skin.
+      ctx.globalCompositeOperation = 'multiply';
+
+      const bruiseGradient = ctx.createRadialGradient(centerX, centerY, radius * 0.2, centerX, centerY, radius);
+      const intensity = bruise.intensity;
+      
+      // Dark purple/blue center for fresh bruise impact
+      bruiseGradient.addColorStop(0, `rgba(20, 10, 50, ${0.5 * intensity})`);
+      // Fading to a reddish purple
+      bruiseGradient.addColorStop(0.5, `rgba(90, 20, 60, ${0.4 * intensity})`);
+      // Edges fading to a yellowish/greenish healing color
+      bruiseGradient.addColorStop(0.9, `rgba(100, 90, 30, ${0.3 * intensity})`);
+      bruiseGradient.addColorStop(1, `rgba(100, 90, 30, 0)`);
+
+      ctx.fillStyle = bruiseGradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reset composite operation to draw the swelling on top normally.
+      ctx.globalCompositeOperation = 'source-over';
+
+      // --- 2. Draw Swelling Effect (Overlay) ---
+      // This simulates puffiness with highlights and shadows on top of the bruised skin.
+      const swellIntensity = bruise.intensity * 0.9;
+      const swellRadius = radius * 1.1;
+      
+      const swellGradient = ctx.createRadialGradient(
+        centerX - swellRadius * 0.2, centerY - swellRadius * 0.2, swellRadius * 0.1, 
+        centerX, centerY, swellRadius
+      );
+      // Subtle highlight on one side and shadow on the other to give a 3D feel
+      swellGradient.addColorStop(0, `rgba(255, 255, 255, ${0.08 * swellIntensity})`); // Highlight
+      swellGradient.addColorStop(0.5, `rgba(255, 255, 255, 0)`);
+      swellGradient.addColorStop(1, `rgba(0, 0, 0, ${0.12 * swellIntensity})`); // Shadow
+
+      ctx.fillStyle = swellGradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, swellRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+  }, [dents, spiders, needles, bruises]);
 
   useEffect(() => {
     const image = imageRef.current;
@@ -318,7 +368,7 @@ const App: React.FC = () => {
             let newTargetY = spider.targetY;
             let newSpeed = spider.speed;
 
-            if (dist < 0.04) { // Pick new target more frequently
+            if (dist < 0.04) {
                 if (faceBox) {
                     newTargetX = faceBox.x + Math.random() * faceBox.width;
                     newTargetY = faceBox.y + Math.random() * faceBox.height;
@@ -326,7 +376,7 @@ const App: React.FC = () => {
                     newTargetX = Math.random();
                     newTargetY = Math.random();
                 }
-                newSpeed = 0.002 + Math.random() * 0.003; // New random speed
+                newSpeed = 0.002 + Math.random() * 0.003;
             }
             
             const angle = Math.atan2(dy, dx);
@@ -360,6 +410,7 @@ const App: React.FC = () => {
     setDents([]);
     setSpiders([]);
     setNeedles([]);
+    setBruises([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -458,7 +509,7 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooNeedle') {
-        const minLength = 0.02; // As a percentage of image height/width
+        const minLength = 0.02;
         const maxLength = 0.1;
         const length = minLength + (strength / 100) * (maxLength - minLength);
 
@@ -475,7 +526,18 @@ const App: React.FC = () => {
         setNeedles(prev => [...prev, newNeedle]);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
-    }
+    } else if (activeTool === 'fistPunch') {
+      const newBruise: Bruise = {
+          x: pos.x,
+          y: pos.y,
+          radius: (0.02 + (strength / 100) * 0.08) * (0.8 + Math.random() * 0.4),
+          rotation: Math.random() * Math.PI * 2,
+          intensity: strength / 100,
+      };
+      setBruises(prev => [...prev, newBruise]);
+      setHitCount(prev => prev + 1);
+      setCoins(prev => prev + 5);
+  }
   };
   
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -488,7 +550,7 @@ const App: React.FC = () => {
     }
 
     const pos = getPosOnImage(event);
-    if (pos && (faceBox || !isLoading)) { // Hover is active if facebox exists, or if no loading and just an image
+    if (pos && (faceBox || !isLoading)) {
       let isHovering = false;
       if (faceBox) {
         const { x, y } = pos;
@@ -507,7 +569,7 @@ const App: React.FC = () => {
   
   const getCursor = () => {
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle') && imageSrc) return 'crosshair';
+      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch') && imageSrc) return 'crosshair';
       return 'default';
   }
 
@@ -616,7 +678,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

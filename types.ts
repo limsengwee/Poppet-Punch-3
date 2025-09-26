@@ -36,6 +36,14 @@ export interface Needle {
   color: string;
 }
 
+export interface Bruise {
+  x: number;
+  y: number;
+  radius: number;
+  rotation: number;
+  intensity: number; // 0 to 1
+}
+
 export interface ImageDimensions {
     width: number;
     height: number;
