@@ -53,9 +53,10 @@ export const HandIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const IronHammerIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const VoodooNeedleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M18 2h-4a2 2 0 0 0-2 2v2H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h6v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM12 16v6h2v-6h-2z" />
+    <path d="M19.78 2.22a.75.75 0 0 0-1.06 0L4.22 16.72a.75.75 0 0 0 1.06 1.06L19.78 3.28a.75.75 0 0 0 0-1.06Z"/>
+    <path d="M19 5a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>
   </svg>
 );
 

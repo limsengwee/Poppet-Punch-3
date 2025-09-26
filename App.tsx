@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle } from './types';
 import { detectFace } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, IronHammerIcon, SpiderIcon, PieIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, PieIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -29,9 +29,9 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
-    { id: 'ironHammer', name: '铁锤', icon: IronHammerIcon },
-    { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'pie', name: '派拍', icon: PieIcon },
+    { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
+    { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'ribbon', name: '彩带', icon: SparkleIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [faceBox, setFaceBox] = useState<FaceBoundingBox | null>(null);
   const [dents, setDents] = useState<Dent[]>([]);
   const [spiders, setSpiders] = useState<Spider[]>([]);
+  const [needles, setNeedles] = useState<Needle[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -71,6 +72,7 @@ const App: React.FC = () => {
     setFaceBox(null);
     setDents([]);
     setSpiders([]);
+    setNeedles([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -90,6 +92,7 @@ const App: React.FC = () => {
   const resetEffects = useCallback(() => {
     setDents([]);
     setSpiders([]);
+    setNeedles([]);
     setHitCount(0);
   }, []);
 
@@ -222,7 +225,57 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-  }, [dents, spiders]);
+    needles.forEach(needle => {
+        const cx = offsetX + needle.x * finalWidth;
+        const cy = offsetY + needle.y * finalHeight;
+        const length = needle.length * Math.min(finalWidth, finalHeight);
+        const headRadius = 4.5;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(needle.rotation);
+        
+        // Needle Shaft - drawn first to be "under" the head
+        ctx.strokeStyle = '#a1a1aa'; // A neutral metallic gray
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        // Add a shadow for depth
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 2;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, headRadius * 0.8); // Start slightly inside the head
+        ctx.lineTo(0, length);
+        ctx.stroke();
+
+        // Reset shadows for the glossy head
+        ctx.shadowColor = 'transparent';
+
+        // Needle Head (base color)
+        ctx.fillStyle = needle.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, headRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Needle Head (3D Highlight)
+        const gradient = ctx.createRadialGradient(
+            -headRadius * 0.4, -headRadius * 0.4, 0,
+            -headRadius * 0.4, -headRadius * 0.4, headRadius * 1.5
+        );
+        gradient.addColorStop(0, 'rgba(255,255,255,0.8)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, headRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.restore();
+    });
+
+  }, [dents, spiders, needles]);
 
   useEffect(() => {
     const image = imageRef.current;
@@ -306,6 +359,7 @@ const App: React.FC = () => {
     setFaceBox(null);
     setDents([]);
     setSpiders([]);
+    setNeedles([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -403,6 +457,24 @@ const App: React.FC = () => {
         setSpiders(prev => [...prev, newSpider]);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
+    } else if (activeTool === 'voodooNeedle') {
+        const minLength = 0.02; // As a percentage of image height/width
+        const maxLength = 0.1;
+        const length = minLength + (strength / 100) * (maxLength - minLength);
+
+        const voodooColors = ['#ef4444', '#f97316', '#facc15', '#4ade80', '#3b82f6', '#a855f7'];
+        const color = voodooColors[Math.floor(Math.random() * voodooColors.length)];
+
+        const newNeedle: Needle = {
+            x: pos.x,
+            y: pos.y,
+            length: length,
+            rotation: Math.random() * Math.PI * 2,
+            color: color,
+        };
+        setNeedles(prev => [...prev, newNeedle]);
+        setHitCount(prev => prev + 1);
+        setCoins(prev => prev + 5);
     }
   };
   
@@ -435,7 +507,7 @@ const App: React.FC = () => {
   
   const getCursor = () => {
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if (activeTool === 'voodooSpider' && imageSrc) return 'crosshair';
+      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle') && imageSrc) return 'crosshair';
       return 'default';
   }
 
@@ -544,7 +616,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

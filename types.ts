@@ -28,6 +28,14 @@ export interface Spider {
   createdAt: number;
 }
 
+export interface Needle {
+  x: number;
+  y: number;
+  length: number;
+  rotation: number;
+  color: string;
+}
+
 export interface ImageDimensions {
     width: number;
     height: number;
