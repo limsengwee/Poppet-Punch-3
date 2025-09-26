@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent } from './types';
+import { FaceBoundingBox, Dent, Spider } from './types';
 import { detectFace } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, IronHammerIcon, FishIcon, PieIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, IronHammerIcon, SpiderIcon, PieIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -30,7 +30,7 @@ const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
     { id: 'ironHammer', name: '铁锤', icon: IronHammerIcon },
-    { id: 'fish', name: '鱼拍', icon: FishIcon },
+    { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'pie', name: '派拍', icon: PieIcon },
     { id: 'ribbon', name: '彩带', icon: SparkleIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [faceBox, setFaceBox] = useState<FaceBoundingBox | null>(null);
   const [dents, setDents] = useState<Dent[]>([]);
+  const [spiders, setSpiders] = useState<Spider[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -54,6 +55,7 @@ const App: React.FC = () => {
   const [coins, setCoins] = useState<number>(480);
   const [hitCount, setHitCount] = useState<number>(0);
   const [activeTool, setActiveTool] = useState<ToolId>('mallet');
+  const [strength, setStrength] = useState<number>(50);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -68,11 +70,13 @@ const App: React.FC = () => {
     setImageSrc(null);
     setFaceBox(null);
     setDents([]);
+    setSpiders([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
     setMousePosition(null);
     setHitCount(0);
+    setCoins(480); // Reset coins to initial value
     if(fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -82,6 +86,58 @@ const App: React.FC = () => {
       ctx?.clearRect(0, 0, canvas.width, canvas.height);
     }
   }, [imageSrc]);
+  
+  const resetEffects = useCallback(() => {
+    setDents([]);
+    setSpiders([]);
+    setHitCount(0);
+  }, []);
+
+  const drawSpider = (ctx: CanvasRenderingContext2D, size: number) => {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = size * 0.1;
+
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 0.7, size, Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Head
+      ctx.beginPath();
+      ctx.arc(0, size * 0.8, size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Legs
+      const leg = (s: number, flip = false) => {
+          const m = flip ? -1 : 1;
+          ctx.beginPath();
+          ctx.moveTo(0, s * 0.2);
+          ctx.lineTo(m * s * 1.5, s * 0.5);
+          ctx.lineTo(m * s * 2, -s * 0.5);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, -s*0.1);
+          ctx.lineTo(m * s * 1.8, -s*0.3);
+          ctx.lineTo(m * s * 2.2, -s*1.2);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, s * 0.5);
+          ctx.lineTo(m * s * 1.2, s * 1.2);
+          ctx.lineTo(m * s * 1.8, s * 1.8);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, -s*0.4);
+          ctx.lineTo(m * s * 1.0, -s * 1.5);
+          ctx.lineTo(m * s * 1.5, -s * 2.2);
+          ctx.stroke();
+      };
+      leg(size);
+      leg(size, true);
+  };
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -153,7 +209,20 @@ const App: React.FC = () => {
           ctx.stroke();
       }
     });
-  }, [dents]);
+
+    spiders.forEach(spider => {
+      const cx = offsetX + spider.x * finalWidth;
+      const cy = offsetY + spider.y * finalHeight;
+      const size = spider.size * Math.min(finalWidth, finalHeight);
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(spider.rotation + Math.PI / 2); // adjust rotation to face forward
+      drawSpider(ctx, size);
+      ctx.restore();
+    });
+
+  }, [dents, spiders]);
 
   useEffect(() => {
     const image = imageRef.current;
@@ -183,11 +252,60 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [dents, redrawCanvas]);
 
+  useEffect(() => {
+    if (spiders.length === 0) return;
+    let animationFrameId: number;
+    const animate = () => {
+        setSpiders(currentSpiders => currentSpiders.map(spider => {
+            const dx = spider.targetX - spider.x;
+            const dy = spider.targetY - spider.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let newTargetX = spider.targetX;
+            let newTargetY = spider.targetY;
+            let newSpeed = spider.speed;
+
+            if (dist < 0.04) { // Pick new target more frequently
+                if (faceBox) {
+                    newTargetX = faceBox.x + Math.random() * faceBox.width;
+                    newTargetY = faceBox.y + Math.random() * faceBox.height;
+                } else {
+                    newTargetX = Math.random();
+                    newTargetY = Math.random();
+                }
+                newSpeed = 0.002 + Math.random() * 0.003; // New random speed
+            }
+            
+            const angle = Math.atan2(dy, dx);
+            const wander = (Math.random() - 0.5) * 0.4;
+            const newRotation = angle + wander;
+
+            const newX = spider.x + Math.cos(newRotation) * newSpeed;
+            const newY = spider.y + Math.sin(newRotation) * newSpeed;
+            
+            return { 
+                ...spider, 
+                x: newX, 
+                y: newY, 
+                rotation: newRotation, 
+                targetX: newTargetX, 
+                targetY: newTargetY, 
+                speed: newSpeed 
+            };
+        }));
+        animationFrameId = requestAnimationFrame(animate);
+    };
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [spiders.length, faceBox]);
+
+
   const runFaceDetection = useCallback(async (file: File) => {
     setIsLoading(true);
     setError(null);
     setFaceBox(null);
     setDents([]);
+    setSpiders([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -230,12 +348,12 @@ const App: React.FC = () => {
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== 'mallet') return;
-    
     const pos = getPosOnImage(event);
+    if (!pos || !imageSrc || isLoading) return;
+    
     const ctx = canvasRef.current?.getContext('2d');
-    if (!pos || !ctx) return;
-
+    if (!ctx) return;
+    
     let canHit = false;
     if (faceBox) {
         const { x, y } = pos;
@@ -243,22 +361,46 @@ const App: React.FC = () => {
         if (x >= faceX && x <= faceX + faceW && y >= faceY && y <= faceY + faceH) {
             canHit = true;
         }
-    } else if (imageSrc && !isLoading) {
-        canHit = true; // Allow hitting anywhere if no face detected or detection was skipped
+    } else {
+        canHit = true; 
     }
+    
+    if (!canHit) return;
 
-    if (canHit) {
+    if (activeTool === 'mallet') {
         const pixelData = ctx.getImageData(pos.absoluteX, pos.absoluteY, 1, 1).data;
         const [r, g, b] = pixelData;
         const shadowColor = `rgba(${Math.max(0, r-50)}, ${Math.max(0, g-50)}, ${Math.max(0, b-50)}, 0.5)`;
         const highlightColor = `rgba(${Math.min(255, r+50)}, ${Math.min(255, g+50)}, ${Math.min(255, b+50)}, 0.5)`;
+        
+        const baseRadius = 0.01 + (strength / 100) * 0.04;
+        const randomFactor = Math.random() * 0.01;
+
         const newDent: Dent = {
             x: pos.x, y: pos.y,
-            radius: (Math.random() * 0.03) + 0.02,
+            radius: baseRadius + randomFactor,
             rotation: Math.random() * Math.PI * 2,
             shadowColor, highlightColor, createdAt: performance.now(),
         };
         setDents(prevDents => [...prevDents, newDent]);
+        setHitCount(prev => prev + 1);
+        setCoins(prev => prev + 5);
+    } else if (activeTool === 'voodooSpider') {
+        const baseSize = 0.005 + (strength / 100) * 0.02;
+        const randomFactor = Math.random() * 0.005;
+
+        const newSpider: Spider = {
+            id: performance.now(),
+            x: pos.x,
+            y: pos.y,
+            size: baseSize + randomFactor,
+            rotation: Math.random() * Math.PI * 2,
+            speed: 0.002 + Math.random() * 0.003,
+            targetX: faceBox ? faceBox.x + Math.random() * faceBox.width : Math.random(),
+            targetY: faceBox ? faceBox.y + Math.random() * faceBox.height : Math.random(),
+            createdAt: performance.now(),
+        };
+        setSpiders(prev => [...prev, newSpider]);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     }
@@ -267,10 +409,12 @@ const App: React.FC = () => {
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMousePosition({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+
     if (activeTool !== 'mallet') {
       setIsHoveringFace(false);
       return;
     }
+
     const pos = getPosOnImage(event);
     if (pos && (faceBox || !isLoading)) { // Hover is active if facebox exists, or if no loading and just an image
       let isHovering = false;
@@ -288,13 +432,19 @@ const App: React.FC = () => {
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+  
+  const getCursor = () => {
+      if (activeTool === 'mallet' && isHoveringFace) return 'none';
+      if (activeTool === 'voodooSpider' && imageSrc) return 'crosshair';
+      return 'default';
+  }
 
   const ToolButton: React.FC<{tool: typeof tools[number]}> = ({ tool }) => {
     const isActive = activeTool === tool.id;
     return (
         <button
             onClick={() => setActiveTool(tool.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 aspect-square ${
                 isActive ? 'bg-yellow-500 text-slate-900 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600/50'
             }`}
             aria-label={tool.name}
@@ -344,7 +494,7 @@ const App: React.FC = () => {
                       className="relative w-full h-full rounded-lg overflow-hidden bg-slate-900/50"
                       onMouseMove={handleMouseMove}
                       onMouseLeave={() => { setIsHoveringFace(false); setMousePosition(null); }}
-                      style={{ cursor: isHoveringFace ? 'none' : 'default' }}
+                      style={{ cursor: getCursor() }}
                     >
                         <img ref={imageRef} src={imageSrc} alt="Uploaded" className="w-full h-full object-contain block opacity-0 pointer-events-none" />
                         <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" onClick={handleCanvasClick} />
@@ -376,6 +526,31 @@ const App: React.FC = () => {
                     <p className="text-xs text-slate-400 text-center mt-3">所有工具已解锁! 尽情使用!</p>
                 </div>
 
+                <div id="strength-slider" className="bg-slate-800/40 p-3 rounded-lg">
+                    <div className="flex justify-between items-center mb-2 text-sm">
+                        <label htmlFor="strength" className="font-bold text-slate-300">强度</label>
+                        <span className="font-bold text-yellow-400 text-base">{strength}</span>
+                    </div>
+                    <input
+                        id="strength"
+                        type="range"
+                        min="1"
+                        max="100"
+                        value={strength}
+                        onChange={(e) => setStrength(Number(e.target.value))}
+                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                    />
+                </div>
+
+                <button 
+                    onClick={resetEffects}
+                    disabled={dents.length === 0 && spiders.length === 0}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+                >
+                    <BroomIcon className="w-5 h-5" />
+                    重置效果
+                </button>
+
                 <div id="progress-stats" className="bg-slate-800/40 p-4 rounded-lg">
                     <h3 className="text-xl font-bold mb-3">进度统计</h3>
                     <div className="text-center mb-3">
@@ -405,11 +580,13 @@ const App: React.FC = () => {
                         <span className="font-bold text-lg text-green-400">+5 金币</span>
                     </div>
                 </div>
-
-                <button onClick={resetState} className="w-full mt-auto flex items-center justify-center gap-2 px-6 py-3 bg-red-800 text-white font-bold rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
-                    <RestartIcon className="w-6 h-6" />
-                    重新开始
-                </button>
+                
+                <div className="mt-auto flex flex-col gap-2">
+                    <button onClick={resetState} className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-800 text-white font-bold rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                        <RestartIcon className="w-6 h-6" />
+                        重新开始
+                    </button>
+                </div>
             </aside>
         </main>
       </div>

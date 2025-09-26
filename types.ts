@@ -16,6 +16,18 @@ export interface Dent {
   createdAt: number;
 }
 
+export interface Spider {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  speed: number;
+  targetX: number;
+  targetY: number;
+  createdAt: number;
+}
+
 export interface ImageDimensions {
     width: number;
     height: number;

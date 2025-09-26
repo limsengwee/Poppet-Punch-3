@@ -59,9 +59,9 @@ export const IronHammerIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =
   </svg>
 );
 
-export const FishIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const SpiderIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M21.9,8.5c-0.3-0.8-1-1.3-1.8-1.5c-1.3-0.3-2.6,0.2-3.4,1.1c-0.8,0.9-1,2.1-0.6,3.3C16,12,15,12,15,12 C10.6,12,9,8.8,9,8.8S8.8,8.1,8,8.4C7.1,8.7,6,10,6,10c0,0-1.4-0.1-2.2,0.7C3,11.5,3,12.3,3,12.3c0,0.1,0,0.1,0,0.2 C3,13.4,3.7,14,4.5,14S6,13,6,13c0,0,0.3,1.4,1.3,2.2C8.2,16,9.5,16,9.5,16c0.1,0,0.2-1.2,0.2-1.2c0.1,0.5,0.8,1.3,1.6,1.4 C12.3,16.4,13,16,13,16c0,0,0.1-0.9,0.7-1.1c0.6-0.2,1.2,0.4,1.2,0.4s0.6-0.6,1.1-0.5c0.5,0.1,0.7,0.7,0.7,0.7s0.5-0.5,1-0.2 c0.5,0.3,0.6,1,0.6,1s0.5-0.6,1.2-0.4c0.7,0.2,0.9,1,0.9,1v-4.5C22.1,9.4,22.1,8.9,21.9,8.5z M6,12c0,0-0.5,0.8-1.5,0.8 S3.2,12.4,3.1,12.3C3.2,12,3.6,11.5,4,11.2C4.7,10.7,6,11,6,11V12z" />
+    <path d="M19.25 8a.75.75 0 0 0-1.5 0 3.25 3.25 0 0 1-6.5 0 .75.75 0 0 0-1.5 0 4.75 4.75 0 0 0 9.5 0ZM18 12.5a.75.75 0 0 0 0-1.5h-2.14a6.02 6.02 0 0 0-7.72 0H6a.75.75 0 0 0 0 1.5h2.2c.2 1.03.62 2 . whopping.25 2.89V18a.75.75 0 0 0 1.5 0v-2.1a4.52 4.52 0 0 1 4.58 0V18a.75.75 0 0 0 1.5 0v-2.61c.63-.88 1.06-1.86 1.26-2.89H18Z"/>
   </svg>
 );
 
@@ -92,5 +92,11 @@ export const DistortIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 export const RestartIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1-8v4h2v-4h3l-4-4-4 4h3z"></path>
+  </svg>
+);
+
+export const BroomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M19.78 5.64c.26-.26.26-.68 0-.94l-1.41-1.41c-.26-.26-.68-.26-.94 0L12 8.69 6.57 3.29c-.26-.26-.68-.26-.94 0L4.22 4.7c-.26.26-.26.68 0 .94L9.62 11H3c-.55 0-1 .45-1 1v2c0 .55.45 1 1 1h1v5c0 .55.45 1 1 1h8c.55 0 1-.45 1-1v-5h1c.55 0 1-.45 1-1v-2c0-.55-.45-1-1-1h-6.62l5.4-5.36zM7 19v-5h4v5H7z" />
   </svg>
 );
