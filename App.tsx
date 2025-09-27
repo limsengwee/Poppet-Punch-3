@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Crack } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Stitch } from './types';
 import { detectFace } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon, CrackIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, StitchIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -32,10 +32,10 @@ const tools = [
     { id: 'fistPunch', name: '水泡', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
-    { id: 'crack', name: '裂纹', icon: CrackIcon },
+    { id: 'stitch', name: '缝合', icon: StitchIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
-    { id: 'distort', name: '扭曲', icon: DistortIcon },
+    { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
 ];
 
 type ToolId = typeof tools[number]['id'];
@@ -48,7 +48,7 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
-  const [cracks, setCracks] = useState<Crack[]>([]);
+  const [stitches, setStitches] = useState<Stitch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -63,103 +63,27 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
-
-  const resetState = useCallback(() => {
-    if (imageSrc && imageSrc.startsWith('blob:')) {
-      URL.revokeObjectURL(imageSrc);
-    }
-    setImageFile(null);
-    setImageSrc(null);
-    setFaceBox(null);
-    setDents([]);
-    setSpiders([]);
-    setNeedles([]);
-    setBruises([]);
-    setCracks([]);
-    setIsLoading(false);
-    setError(null);
-    setIsHoveringFace(false);
-    setMousePosition(null);
-    setHitCount(0);
-    setCoins(480); // Reset coins to initial value
-    if(fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  }, [imageSrc]);
-  
-  const resetEffects = useCallback(() => {
-    setDents([]);
-    setSpiders([]);
-    setNeedles([]);
-    setBruises([]);
-    setCracks([]);
-    setHitCount(0);
-  }, []);
-
-  const drawSpider = (ctx: CanvasRenderingContext2D, size: number) => {
-      ctx.fillStyle = '#1a1a1a';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = size * 0.1;
-
-      // Body
-      ctx.beginPath();
-      ctx.ellipse(0, 0, size * 0.7, size, Math.PI / 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Head
-      ctx.beginPath();
-      ctx.arc(0, size * 0.8, size * 0.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Legs
-      const leg = (s: number, flip = false) => {
-          const m = flip ? -1 : 1;
-          ctx.beginPath();
-          ctx.moveTo(0, s * 0.2);
-          ctx.lineTo(m * s * 1.5, s * 0.5);
-          ctx.lineTo(m * s * 2, -s * 0.5);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, -s*0.1);
-          ctx.lineTo(m * s * 1.8, -s*0.3);
-          ctx.lineTo(m * s * 2.2, -s*1.2);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, s * 0.5);
-          ctx.lineTo(m * s * 1.2, s * 1.2);
-          ctx.lineTo(m * s * 1.8, s * 1.8);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(0, -s*0.4);
-          ctx.lineTo(m * s * 1.0, -s * 1.5);
-          ctx.lineTo(m * s * 1.5, -s * 2.2);
-          ctx.stroke();
-      };
-      leg(size);
-      leg(size, true);
-  };
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     const image = imageRef.current;
+    const offscreenCanvas = offscreenCanvasRef.current;
 
-    if (!ctx || !canvas || !image || !image.complete || image.naturalWidth === 0) return;
+    const sourceToDraw = offscreenCanvas || image;
+    if (!ctx || !canvas || !sourceToDraw || (sourceToDraw === image && (!image.complete || image.naturalWidth === 0))) return;
     
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     
     const canvasRatio = canvas.width / canvas.height;
-    const imageRatio = image.naturalWidth / image.naturalHeight;
+    const sourceWidth = sourceToDraw.width;
+    const sourceHeight = sourceToDraw.height;
+    const imageRatio = sourceWidth / sourceHeight;
+
 
     let finalWidth, finalHeight, offsetX, offsetY;
 
@@ -177,7 +101,7 @@ const App: React.FC = () => {
     
     renderInfo.current = { offsetX, offsetY, finalWidth, finalHeight };
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, offsetX, offsetY, finalWidth, finalHeight);
+    ctx.drawImage(sourceToDraw, offsetX, offsetY, finalWidth, finalHeight);
 
     const now = performance.now();
     const animationDuration = 500;
@@ -342,125 +266,189 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-    cracks.forEach(crack => {
-      const originX = offsetX + crack.x * finalWidth;
-      const originY = offsetY + crack.y * finalHeight;
-      
-      let seed = crack.seed;
-      const random = () => {
-        const x = Math.sin(seed++) * 10000;
-        return x - Math.floor(x);
-      };
-
-      const maxSegments = 12 + Math.floor(crack.strength / 8);
-      const initialLength = (0.02 + (crack.strength / 100) * 0.08) * Math.min(finalWidth, finalHeight);
-      const initialWidth = 1 + (crack.strength / 100) * 5;
-      const branchProbability = 0.3 + crack.strength / 250;
-      
-      const segments: {x1: number, y1: number, x2: number, y2: number, width: number, life: number}[] = [];
-      const queue = [{
-        x: originX,
-        y: originY,
-        angle: crack.initialAngle,
-        length: initialLength,
-        width: initialWidth,
-        life: 1.0
-      }];
-      
-      let segmentsCreated = 0;
-      while(queue.length > 0 && segmentsCreated < maxSegments) {
-        const current = queue.shift()!;
-        
-        const angleJitter = (random() - 0.5) * 1.0;
-        const nextAngle = current.angle + angleJitter;
-        const nextLength = current.length * (0.85 + random() * 0.15);
-        
-        const nextX = current.x + Math.cos(nextAngle) * current.length;
-        const nextY = current.y + Math.sin(nextAngle) * current.length;
-
-        segments.push({x1: current.x, y1: current.y, x2: nextX, y2: nextY, width: current.width, life: current.life});
-        segmentsCreated++;
-
-        if (nextLength > 2) {
-          queue.push({
-            x: nextX,
-            y: nextY,
-            angle: nextAngle,
-            length: nextLength,
-            width: current.width * 0.9,
-            life: current.life * 0.95
-          });
-        }
-        
-        if (random() < branchProbability && nextLength > 5) {
-          const branchAngle = nextAngle + (random() > 0.5 ? 1 : -1) * (Math.PI / 3 + (random() - 0.5) * 0.4);
-           queue.push({
-            x: nextX,
-            y: nextY,
-            angle: branchAngle,
-            length: nextLength * 0.5,
-            width: current.width * 0.6,
-            life: current.life * 0.9
-          });
-        }
-      }
+    stitches.forEach(stitch => {
+      const centerX = offsetX + stitch.x * finalWidth;
+      const centerY = offsetY + stitch.y * finalHeight;
+      const length = stitch.length * finalHeight;
+      const { strength } = stitch;
 
       ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(stitch.rotation);
+
+      const woundWidth = 1 + (strength / 100) * 1.5;
+      const threadWidth = 1.5 + (strength / 100) * 2;
+      const stitchCrossLength = 6 + (strength / 100) * 10;
+      const numThreads = Math.max(2, Math.floor(strength / 25));
+      const spacing = length / numThreads;
+
+      // 1. The main wound/scar line
       ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      // Pass 1: The main, wide, soft indentation (sunken look).
       ctx.globalCompositeOperation = 'multiply';
-      segments.forEach(seg => {
-        ctx.beginPath();
-        ctx.moveTo(seg.x1, seg.y1);
-        ctx.lineTo(seg.x2, seg.y2);
-        ctx.strokeStyle = `rgba(80, 50, 40, ${0.35 * seg.life})`;
-        ctx.lineWidth = seg.width * 2.5;
-        ctx.stroke();
-      });
+      ctx.strokeStyle = 'rgba(50, 15, 15, 0.7)';
+      ctx.lineWidth = woundWidth;
+      ctx.beginPath();
+      ctx.moveTo(0, -length / 2 - spacing/2);
+      ctx.lineTo(0, length / 2 + spacing/2);
+      ctx.stroke();
 
-      // Pass 2: The raised, dry edges (3D effect).
-      ctx.globalCompositeOperation = 'soft-light';
-      segments.forEach(seg => {
-        const angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1);
-        const offsetX = Math.sin(angle) * (seg.width * 0.7);
-        const offsetY = -Math.cos(angle) * (seg.width * 0.7);
-        
-        ctx.beginPath();
-        ctx.moveTo(seg.x1 + offsetX, seg.y1 + offsetY);
-        ctx.lineTo(seg.x2 + offsetX, seg.y2 + offsetY);
-        ctx.moveTo(seg.x1 - offsetX, seg.y1 - offsetY);
-        ctx.lineTo(seg.x2 - offsetX, seg.y2 - offsetY);
-        
-        ctx.strokeStyle = `rgba(255, 240, 230, ${0.4 * seg.life})`;
-        ctx.lineWidth = seg.width * 1.2;
-        ctx.stroke();
-      });
+      // 2. Render each thread and its holes
+      ctx.globalCompositeOperation = 'source-over';
+      for (let i = 0; i < numThreads; i++) {
+        const y = -length / 2 + spacing / 2 + i * spacing;
 
-      // Pass 3: The deep, central fissure (sharp definition).
-      ctx.globalCompositeOperation = 'multiply';
-      segments.forEach(seg => {
+        // Holes
+        ctx.fillStyle = 'rgba(40, 10, 10, 0.8)';
         ctx.beginPath();
-        ctx.moveTo(seg.x1, seg.y1);
-        ctx.lineTo(seg.x2, seg.y2);
-        ctx.strokeStyle = `rgba(50, 25, 15, ${0.7 * seg.life})`;
-        ctx.lineWidth = seg.width * 0.5;
+        ctx.arc(-stitchCrossLength / 2, y, threadWidth * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(stitchCrossLength / 2, y, threadWidth * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Thread shadow
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = threadWidth + 1;
+        ctx.beginPath();
+        ctx.moveTo(-stitchCrossLength / 2, y + 0.5);
+        ctx.lineTo(stitchCrossLength / 2, y + 0.5);
         ctx.stroke();
-      });
+        
+        // Thread
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = threadWidth;
+        ctx.beginPath();
+        ctx.moveTo(-stitchCrossLength / 2, y);
+        ctx.lineTo(stitchCrossLength / 2, y);
+        ctx.stroke();
+      }
 
       ctx.restore();
     });
 
-  }, [dents, spiders, needles, bruises, cracks]);
+  }, [dents, spiders, needles, bruises, stitches]);
+  
+  const resetState = useCallback(() => {
+    if (imageSrc && imageSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(imageSrc);
+    }
+    setImageFile(null);
+    setImageSrc(null);
+    setFaceBox(null);
+    setDents([]);
+    setSpiders([]);
+    setNeedles([]);
+    setBruises([]);
+    setStitches([]);
+    setIsLoading(false);
+    setError(null);
+    setIsHoveringFace(false);
+    setMousePosition(null);
+    setHitCount(0);
+    setCoins(480); // Reset coins to initial value
+    if(fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    offscreenCanvasRef.current = null;
+  }, [imageSrc]);
+  
+  const resetEffects = useCallback(() => {
+    setDents([]);
+    setSpiders([]);
+    setNeedles([]);
+    setBruises([]);
+    setStitches([]);
+    setHitCount(0);
+
+    const offscreenCanvas = offscreenCanvasRef.current;
+    const image = imageRef.current;
+    if (offscreenCanvas && image && image.complete) {
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        if (offscreenCtx) {
+            offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            offscreenCtx.drawImage(image, 0, 0);
+            redrawCanvas();
+        }
+    }
+  }, [redrawCanvas]);
+
+  const drawSpider = (ctx: CanvasRenderingContext2D, size: number) => {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = size * 0.1;
+
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 0.7, size, Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Head
+      ctx.beginPath();
+      ctx.arc(0, size * 0.8, size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Legs
+      const leg = (s: number, flip = false) => {
+          const m = flip ? -1 : 1;
+          ctx.beginPath();
+          ctx.moveTo(0, s * 0.2);
+          ctx.lineTo(m * s * 1.5, s * 0.5);
+          ctx.lineTo(m * s * 2, -s * 0.5);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, -s*0.1);
+          ctx.lineTo(m * s * 1.8, -s*0.3);
+          ctx.lineTo(m * s * 2.2, -s*1.2);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, s * 0.5);
+          ctx.lineTo(m * s * 1.2, s * 1.2);
+          ctx.lineTo(m * s * 1.8, s * 1.8);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, -s*0.4);
+          ctx.lineTo(m * s * 1.0, -s * 1.5);
+          ctx.lineTo(m * s * 1.5, -s * 2.2);
+          ctx.stroke();
+      };
+      leg(size);
+      leg(size, true);
+  };
 
   useEffect(() => {
     const image = imageRef.current;
     if (!image || !imageSrc) return;
-    const handleLoad = () => redrawCanvas();
-    if (image.complete) handleLoad();
-    else image.addEventListener('load', handleLoad);
-    return () => image.removeEventListener('load', handleLoad);
+
+    const initializeCanvases = () => {
+        if (!offscreenCanvasRef.current) {
+            offscreenCanvasRef.current = document.createElement('canvas');
+        }
+        const offscreenCanvas = offscreenCanvasRef.current;
+        offscreenCanvas.width = image.naturalWidth;
+        offscreenCanvas.height = image.naturalHeight;
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        offscreenCtx?.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight);
+        
+        redrawCanvas();
+    };
+
+    if (image.complete && image.naturalWidth > 0) {
+        initializeCanvases();
+    } else {
+        image.addEventListener('load', initializeCanvases);
+    }
+
+    return () => {
+        image.removeEventListener('load', initializeCanvases);
+    };
   }, [imageSrc, redrawCanvas]);
 
   useEffect(() => {
@@ -538,7 +526,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setCracks([]);
+    setStitches([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -579,26 +567,81 @@ const App: React.FC = () => {
     if (mouseX < offsetX || mouseX > offsetX + finalWidth || mouseY < offsetY || mouseY > offsetY + finalHeight) return null;
     return { x: (mouseX - offsetX) / finalWidth, y: (mouseY - offsetY) / finalHeight, absoluteX: mouseX, absoluteY: mouseY };
   };
+  
+  const applyTornadoEffect = (canvasX: number, canvasY: number) => {
+    const offscreenCanvas = offscreenCanvasRef.current;
+    if (!offscreenCanvas) return;
 
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = getPosOnImage(event);
-    if (!pos || !imageSrc || isLoading) return;
+    const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+    if (!offscreenCtx) return;
+
+    const { finalWidth, finalHeight, offsetX, offsetY } = renderInfo.current;
     
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    
-    let canHit = false;
-    if (faceBox) {
-        const { x, y } = pos;
-        const { x: faceX, y: faceY, width: faceW, height: faceH } = faceBox;
-        if (x >= faceX && x <= faceX + faceW && y >= faceY && y <= faceY + faceH) {
-            canHit = true;
+    const imageX = ((canvasX - offsetX) / finalWidth) * offscreenCanvas.width;
+    const imageY = ((canvasY - offsetY) / finalHeight) * offscreenCanvas.height;
+
+    const radius = (strength / 100) * (Math.min(offscreenCanvas.width, offscreenCanvas.height) * 0.15);
+    const angle = (strength / 100) * Math.PI;
+
+    if (radius <= 0) return;
+
+    const startX = Math.floor(Math.max(0, imageX - radius));
+    const startY = Math.floor(Math.max(0, imageY - radius));
+    const width = Math.floor(Math.min(offscreenCanvas.width, imageX + radius)) - startX;
+    const height = Math.floor(Math.min(offscreenCanvas.height, imageY + radius)) - startY;
+
+    if (width <= 0 || height <= 0) return;
+
+    const originalData = offscreenCtx.getImageData(startX, startY, width, height);
+    const warpedData = offscreenCtx.createImageData(width, height);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const currentX = startX + x;
+            const currentY = startY + y;
+
+            const dx = currentX - imageX;
+            const dy = currentY - imageY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            const pixelIndex = (y * width + x) * 4;
+
+            if (distance < radius) {
+                const percent = 1 - (distance / radius);
+                const theta = Math.atan2(dy, dx);
+                const twistAngle = percent * percent * angle;
+
+                const srcX = Math.floor(imageX + distance * Math.cos(theta - twistAngle));
+                const srcY = Math.floor(imageY + distance * Math.sin(theta - twistAngle));
+                
+                if (srcX >= startX && srcX < startX + width && srcY >= startY && srcY < startY + height) {
+                    const srcIndex = ((srcY - startY) * width + (srcX - startX)) * 4;
+                    warpedData.data[pixelIndex] = originalData.data[srcIndex];
+                    warpedData.data[pixelIndex + 1] = originalData.data[srcIndex + 1];
+                    warpedData.data[pixelIndex + 2] = originalData.data[srcIndex + 2];
+                    warpedData.data[pixelIndex + 3] = originalData.data[srcIndex + 3];
+                } else {
+                    warpedData.data[pixelIndex] = originalData.data[pixelIndex];
+                    warpedData.data[pixelIndex + 1] = originalData.data[pixelIndex + 1];
+                    warpedData.data[pixelIndex + 2] = originalData.data[pixelIndex + 2];
+                    warpedData.data[pixelIndex + 3] = originalData.data[pixelIndex + 3];
+                }
+            } else {
+                warpedData.data[pixelIndex] = originalData.data[pixelIndex];
+                warpedData.data[pixelIndex + 1] = originalData.data[pixelIndex + 1];
+                warpedData.data[pixelIndex + 2] = originalData.data[pixelIndex + 2];
+                warpedData.data[pixelIndex + 3] = originalData.data[pixelIndex + 3];
+            }
         }
-    } else {
-        canHit = true; 
     }
     
-    if (!canHit) return;
+    offscreenCtx.putImageData(warpedData, startX, startY);
+    redrawCanvas();
+  };
+
+  const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
 
     if (activeTool === 'mallet') {
         const pixelData = ctx.getImageData(pos.absoluteX, pos.absoluteY, 1, 1).data;
@@ -677,51 +720,89 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
-    } else if (activeTool === 'crack') {
-        const newCrack: Crack = {
+    } else if (activeTool === 'stitch') {
+        const baseLength = 0.025 + (strength / 100) * 0.05;
+
+        const newStitch: Stitch = {
             id: performance.now(),
             x: pos.x,
             y: pos.y,
+            length: baseLength,
+            rotation: Math.random() * Math.PI,
             strength: strength,
-            seed: Math.random(),
-            initialAngle: Math.random() * Math.PI * 2,
         };
-        setCracks(prev => [...prev, newCrack]);
+        setStitches(prev => [...prev, newStitch]);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     }
   };
   
+  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const pos = getPosOnImage(event);
+    if (!pos || !imageSrc || isLoading) return;
+
+    let canHit = false;
+    if (faceBox) {
+        if (pos.x >= faceBox.x && pos.x <= faceBox.x + faceBox.width && pos.y >= faceBox.y && pos.y <= faceBox.y + faceBox.height) {
+            canHit = true;
+        }
+    } else {
+        canHit = true; 
+    }
+    
+    if (!canHit) return;
+
+    if (activeTool === 'tornado') {
+        isDraggingRef.current = true;
+        applyTornadoEffect(pos.absoluteX, pos.absoluteY);
+    } else {
+        applyToolEffect(pos);
+    }
+  };
+  
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setMousePosition({ x: event.clientX - rect.left, y: event.clientY - rect.top });
-
-    if (activeTool !== 'mallet') {
-      setIsHoveringFace(false);
-      return;
-    }
-
+    const currentMousePos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    setMousePosition(currentMousePos);
+    
     const pos = getPosOnImage(event);
-    if (pos && (faceBox || !isLoading)) {
-      let isHovering = false;
-      if (faceBox) {
-        const { x, y } = pos;
-        const { x: faceX, y: faceY, width: faceW, height: faceH } = faceBox;
-        isHovering = (x >= faceX && x <= faceX + faceW && y >= faceY && y <= faceY + faceH);
-      } else {
-        isHovering = true;
-      }
-      setIsHoveringFace(isHovering);
-    } else {
-      setIsHoveringFace(false);
+    if (!pos) return;
+
+
+    if (isDraggingRef.current && activeTool === 'tornado') {
+        applyTornadoEffect(pos.absoluteX, pos.absoluteY);
     }
+
+    if (activeTool === 'mallet') {
+        if (faceBox || !isLoading) {
+            let isHovering = false;
+            if (faceBox) {
+                const { x, y } = pos;
+                const { x: faceX, y: faceY, width: faceW, height: faceH } = faceBox;
+                isHovering = (x >= faceX && x <= faceX + faceW && y >= faceY && y <= faceY + faceH);
+            } else {
+                isHovering = true;
+            }
+            setIsHoveringFace(isHovering);
+        } else {
+            setIsHoveringFace(false);
+        }
+    } else {
+        setIsHoveringFace(false);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
   
   const getCursor = () => {
+      if (!imageSrc) return 'default';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'crack') && imageSrc) return 'crosshair';
+      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'stitch') return 'crosshair';
+      if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
       return 'default';
   }
 
@@ -778,12 +859,14 @@ const App: React.FC = () => {
                 ) : (
                     <div 
                       className="relative w-full h-full rounded-lg overflow-hidden bg-slate-900/50"
+                      onMouseDown={handleMouseDown}
                       onMouseMove={handleMouseMove}
-                      onMouseLeave={() => { setIsHoveringFace(false); setMousePosition(null); }}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={() => { setIsHoveringFace(false); setMousePosition(null); isDraggingRef.current = false; }}
                       style={{ cursor: getCursor() }}
                     >
                         <img ref={imageRef} src={imageSrc} alt="Uploaded" className="w-full h-full object-contain block opacity-0 pointer-events-none" />
-                        <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" onClick={handleCanvasClick} />
+                        <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
                         <AnimatedMalletCursor position={mousePosition} visible={isHoveringFace} />
                         
                         {isLoading && (
@@ -830,7 +913,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && cracks.length === 0}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && stitches.length === 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

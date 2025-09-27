@@ -45,13 +45,13 @@ export interface Bruise {
   aspectRatio: number;
 }
 
-export interface Crack {
+export interface Stitch {
   id: number;
   x: number;
   y: number;
+  length: number;
+  rotation: number;
   strength: number;
-  seed: number;
-  initialAngle: number;
 }
 
 export interface ImageDimensions {

@@ -82,9 +82,11 @@ export const SparkleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const CrackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const StitchIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M20.57,3.34a1,1,0,0,0-1.07.12L13,8.4,11.11,5.29a1,1,0,0,0-1.21-.49L5.33,6.54,4.16,4.12a1,1,0,0,0-1.35-.61,1,1,0,0,0-.61,1.35l1.17,2.42L1.08,9.57a1,1,0,0,0,.19,1.4,1,1,0,0,0,1.4-.19l2.29-2.3,2.58.55-1.84,3.19a1,1,0,0,0,.3,1.32A1,1,0,0,0,7,13a1,1,0,0,0,.69-.28L9.8,9.75l3.8,2.71-3,5.2a1,1,0,0,0,.21,1.33,1,1,0,0,0,1.33-.21l3-5.2,1.35,2.34a1,1,0,0,0,1.3.5,1,1,0,0,0,.5-1.3L16.21,13l5.07-5.07a1,1,0,0,0,.2-1.1A1,1,0,0,0,20.57,3.34Z"/>
+    <path d="M11 4H13V20H11z" />
+    <path d="M7 8H17V10H7z" />
+    <path d="M7 14H17V16H7z" />
   </svg>
 );
 
@@ -95,10 +97,9 @@ export const LightningIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
   </svg>
 );
 
-export const DistortIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const TornadoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M12 4C8.68629 4 6 6.68629 6 10C6 13.3137 8.68629 16 12 16C15.3137 16 18 13.3137 18 10C18 6.68629 15.3137 4 12 4ZM4 10C4 5.58172 7.58172 2 12 2C16.4183 2 20 5.58172 20 10C20 14.4183 16.4183 18 12 18C7.58172 18 4 14.4183 4 10Z"/>
-    <path d="M12 20C14.2091 20 16 20.8954 16 22C16 23.1046 14.2091 24 12 24C9.79086 24 8 23.1046 8 22C8 20.8954 9.79086 20 12 20Z" />
+    <path d="M1,3H23V5H1V3M3,7H21V9H3V7M7,11H17V13H7V11M12,15H12V17H12V15M10,19H14V21H10V19Z" />
   </svg>
 );
 
