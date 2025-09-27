@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { FaceBoundingBox } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -81,6 +81,50 @@ export async function detectFace(
     return null;
   } catch (error) {
     console.error("Error detecting face:", error);
+    return null;
+  }
+}
+
+
+export async function applyCracksWithAI(
+  base64ImageData: string,
+  mimeType: string,
+  strength: number
+): Promise<string | null> {
+  try {
+    const imagePart = base64ToGenerativePart(base64ImageData, mimeType);
+    
+    let intensity_description = "moderate, like dry earth";
+    if (strength <= 33) {
+      intensity_description = "subtle and fine, like delicate porcelain";
+    } else if (strength >= 67) {
+      intensity_description = "deep and extensive, like shattering stone";
+    }
+
+    const prompt = `Using the provided image, realistically edit the person's skin to look like it is cracking. The cracks should look natural and follow the contours of the face. The intensity of the cracking should be ${intensity_description}. Do not add any text or watermarks to the image.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
+      contents: {
+        parts: [
+          imagePart,
+          { text: prompt },
+        ],
+      },
+      config: {
+          responseModalities: [Modality.IMAGE, Modality.TEXT],
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return part.inlineData.data; // Return the base64 string of the new image
+      }
+    }
+
+    return null; // No image part found in the response
+  } catch (error) {
+    console.error("Error applying AI crack effect:", error);
     return null;
   }
 }

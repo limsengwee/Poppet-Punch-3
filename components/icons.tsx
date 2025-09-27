@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // Fix: Updated MalletIcon props to accept standard SVG props like `style`, resolving the TypeScript error. The hardcoded transform was removed to fix a style override bug.
@@ -82,12 +83,10 @@ export const SparkleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const StitchIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M11 4H13V20H11z" />
-    <path d="M7 8H17V10H7z" />
-    <path d="M7 14H17V16H7z" />
-  </svg>
+export const CrackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
+        <path d="M12 3V9.5M12 14.5V21M12 9.5L7 7L4 9M12 9.5L17 7L20 9M12 14.5L7 17L4 15M12 14.5L17 17L20 15" />
+    </svg>
 );
 
 

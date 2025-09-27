@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Stitch } from './types';
-import { detectFace } from './services/geminiService';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
+import { detectFace, applyCracksWithAI } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, StitchIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -32,7 +33,7 @@ const tools = [
     { id: 'fistPunch', name: '水泡', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
-    { id: 'stitch', name: '缝合', icon: StitchIcon },
+    { id: 'crack', name: '裂纹', icon: CrackIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
     { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
@@ -48,8 +49,8 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
-  const [stitches, setStitches] = useState<Stitch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isAiProcessing, setIsAiProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
   const [mousePosition, setMousePosition] = useState<{ x: number, y: number } | null>(null);
@@ -266,67 +267,7 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-    stitches.forEach(stitch => {
-      const centerX = offsetX + stitch.x * finalWidth;
-      const centerY = offsetY + stitch.y * finalHeight;
-      const length = stitch.length * finalHeight;
-      const { strength } = stitch;
-
-      ctx.save();
-      ctx.translate(centerX, centerY);
-      ctx.rotate(stitch.rotation);
-
-      const woundWidth = 1 + (strength / 100) * 1.5;
-      const threadWidth = 1.5 + (strength / 100) * 2;
-      const stitchCrossLength = 6 + (strength / 100) * 10;
-      const numThreads = Math.max(2, Math.floor(strength / 25));
-      const spacing = length / numThreads;
-
-      // 1. The main wound/scar line
-      ctx.lineCap = 'round';
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.strokeStyle = 'rgba(50, 15, 15, 0.7)';
-      ctx.lineWidth = woundWidth;
-      ctx.beginPath();
-      ctx.moveTo(0, -length / 2 - spacing/2);
-      ctx.lineTo(0, length / 2 + spacing/2);
-      ctx.stroke();
-
-      // 2. Render each thread and its holes
-      ctx.globalCompositeOperation = 'source-over';
-      for (let i = 0; i < numThreads; i++) {
-        const y = -length / 2 + spacing / 2 + i * spacing;
-
-        // Holes
-        ctx.fillStyle = 'rgba(40, 10, 10, 0.8)';
-        ctx.beginPath();
-        ctx.arc(-stitchCrossLength / 2, y, threadWidth * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(stitchCrossLength / 2, y, threadWidth * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Thread shadow
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.lineWidth = threadWidth + 1;
-        ctx.beginPath();
-        ctx.moveTo(-stitchCrossLength / 2, y + 0.5);
-        ctx.lineTo(stitchCrossLength / 2, y + 0.5);
-        ctx.stroke();
-        
-        // Thread
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = threadWidth;
-        ctx.beginPath();
-        ctx.moveTo(-stitchCrossLength / 2, y);
-        ctx.lineTo(stitchCrossLength / 2, y);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    });
-
-  }, [dents, spiders, needles, bruises, stitches]);
+  }, [dents, spiders, needles, bruises]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -339,7 +280,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setStitches([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -362,7 +302,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setStitches([]);
     setHitCount(0);
 
     const offscreenCanvas = offscreenCanvasRef.current;
@@ -526,7 +465,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setStitches([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -639,6 +577,48 @@ const App: React.FC = () => {
     redrawCanvas();
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleApplyCracks = async () => {
+      if (!imageFile || isAiProcessing) return;
+
+      setIsAiProcessing(true);
+      setError(null);
+
+      try {
+          const base64Data = await fileToBase64(imageFile);
+          const newBase64 = await applyCracksWithAI(base64Data, imageFile.type, strength);
+          
+          if (newBase64) {
+              const newMimeType = 'image/png';
+              const newImageSrc = `data:${newMimeType};base64,${newBase64}`;
+              
+              const blob = await (await fetch(newImageSrc)).blob();
+              const newFile = new File([blob], imageFile.name, { type: newMimeType });
+
+              setImageFile(newFile);
+              setImageSrc(newImageSrc); 
+              setHitCount(prev => prev + 1);
+              setCoins(prev => prev + 25);
+          } else {
+              setError("AI 无法生成效果，请重试。");
+          }
+      } catch (e) {
+          console.error(e);
+          setError("应用 AI 效果时出错。");
+      } finally {
+          setIsAiProcessing(false);
+      }
+  };
+
+
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
@@ -720,26 +700,12 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
-    } else if (activeTool === 'stitch') {
-        const baseLength = 0.025 + (strength / 100) * 0.05;
-
-        const newStitch: Stitch = {
-            id: performance.now(),
-            x: pos.x,
-            y: pos.y,
-            length: baseLength,
-            rotation: Math.random() * Math.PI,
-            strength: strength,
-        };
-        setStitches(prev => [...prev, newStitch]);
-        setHitCount(prev => prev + 1);
-        setCoins(prev => prev + 5);
     }
   };
   
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const pos = getPosOnImage(event);
-    if (!pos || !imageSrc || isLoading) return;
+    if (!pos || !imageSrc || isLoading || activeTool === 'crack') return;
 
     let canHit = false;
     if (faceBox) {
@@ -801,8 +767,9 @@ const App: React.FC = () => {
   const getCursor = () => {
       if (!imageSrc) return 'default';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'stitch') return 'crosshair';
+      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch') return 'crosshair';
       if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
+      if (activeTool === 'crack') return 'default';
       return 'default';
   }
 
@@ -869,10 +836,12 @@ const App: React.FC = () => {
                         <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
                         <AnimatedMalletCursor position={mousePosition} visible={isHoveringFace} />
                         
-                        {isLoading && (
+                        {(isLoading || isAiProcessing) && (
                             <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-10">
                                 <SpinnerIcon className="w-12 h-12 text-yellow-400" />
-                                <p className="mt-4 text-lg font-semibold animate-pulse">Detecting face...</p>
+                                <p className="mt-4 text-lg font-semibold animate-pulse">
+                                  {isLoading ? 'Detecting face...' : 'AI 正在生成效果...'}
+                                </p>
                             </div>
                         )}
                         {error && <div className="absolute bottom-4 left-4 right-4 text-center text-red-400 bg-red-900/50 px-4 py-2 rounded-md z-10">{error}</div>}
@@ -909,11 +878,24 @@ const App: React.FC = () => {
                         onChange={(e) => setStrength(Number(e.target.value))}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                     />
+                     {activeTool === 'crack' && (
+                        <div className="mt-4 flex flex-col items-center gap-3">
+                            <p className="text-xs text-center text-slate-400">AI效果将应用于整个面部。强度越高，裂纹越明显。</p>
+                            <button 
+                                onClick={handleApplyCracks}
+                                disabled={isAiProcessing || !imageFile}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-yellow-600 text-slate-900 font-bold rounded-lg hover:bg-yellow-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+                            >
+                                {isAiProcessing ? <SpinnerIcon className="w-5 h-5" /> : <SparkleIcon className="w-5 h-5" />}
+                                应用裂纹效果
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && stitches.length === 0}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 }
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

@@ -45,15 +45,6 @@ export interface Bruise {
   aspectRatio: number;
 }
 
-export interface Stitch {
-  id: number;
-  x: number;
-  y: number;
-  length: number;
-  rotation: number;
-  strength: number;
-}
-
 export interface ImageDimensions {
     width: number;
     height: number;
