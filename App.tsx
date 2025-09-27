@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
 import { detectFace } from './services/geminiService';
@@ -276,50 +277,72 @@ const App: React.FC = () => {
     bruises.forEach(bruise => {
       const centerX = offsetX + bruise.x * finalWidth;
       const centerY = offsetY + bruise.y * finalHeight;
-      const radius = bruise.radius * Math.min(finalWidth, finalHeight);
+      const scale = Math.min(finalWidth, finalHeight);
 
       ctx.save();
       
-      // --- 1. Draw Bruise Colors with Blending ---
-      // This uses 'multiply' to darken and tint the skin, making it look like an actual bruise under the skin.
-      ctx.globalCompositeOperation = 'multiply';
+      // Helper to draw a smooth, irregular path from points.
+      const createSmoothIrregularPath = (points: {x:number, y:number}[], pathScale: number = 1) => {
+          // Fallback to circle if no points are available
+          if (!points || points.length < 3) {
+              const fallbackRadius = bruise.radius * scale * pathScale;
+              ctx.beginPath();
+              ctx.arc(centerX, centerY, fallbackRadius, 0, Math.PI * 2);
+              ctx.closePath();
+              return;
+          };
 
-      const bruiseGradient = ctx.createRadialGradient(centerX, centerY, radius * 0.2, centerX, centerY, radius);
-      const intensity = bruise.intensity;
+          const scaledPoints = points.map(p => ({
+              x: centerX + p.x * scale * pathScale,
+              y: centerY + p.y * scale * pathScale,
+          }));
+          
+          ctx.beginPath();
+          // Start at the midpoint of the last and first points
+          ctx.moveTo(
+              (scaledPoints[0].x + scaledPoints[scaledPoints.length - 1].x) / 2,
+              (scaledPoints[0].y + scaledPoints[scaledPoints.length - 1].y) / 2
+          );
+
+          // Use quadratic curves to create a smooth, blob-like shape
+          for (let i = 0; i < scaledPoints.length; i++) {
+              const p1 = scaledPoints[i];
+              const p2 = scaledPoints[(i + 1) % scaledPoints.length];
+              ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+          }
+          ctx.closePath();
+      };
       
-      // Dark purple/blue center for fresh bruise impact
+      // Use the bruise's base radius to define the gradient size, expanded to cover the whole shape.
+      const maxRadius = bruise.radius * 1.3 * scale; 
+
+      // --- 1. Draw Bruise Colors with Blending ---
+      ctx.globalCompositeOperation = 'multiply';
+      const intensity = bruise.intensity;
+      const bruiseGradient = ctx.createRadialGradient(centerX, centerY, maxRadius * 0.2, centerX, centerY, maxRadius);
       bruiseGradient.addColorStop(0, `rgba(20, 10, 50, ${0.5 * intensity})`);
-      // Fading to a reddish purple
       bruiseGradient.addColorStop(0.5, `rgba(90, 20, 60, ${0.4 * intensity})`);
-      // Edges fading to a yellowish/greenish healing color
       bruiseGradient.addColorStop(0.9, `rgba(100, 90, 30, ${0.3 * intensity})`);
       bruiseGradient.addColorStop(1, `rgba(100, 90, 30, 0)`);
-
+      
       ctx.fillStyle = bruiseGradient;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      createSmoothIrregularPath(bruise.shapePoints, 1.0);
       ctx.fill();
 
-      // Reset composite operation to draw the swelling on top normally.
-      ctx.globalCompositeOperation = 'source-over';
-
       // --- 2. Draw Swelling Effect (Overlay) ---
-      // This simulates puffiness with highlights and shadows on top of the bruised skin.
-      const swellIntensity = bruise.intensity * 0.9;
-      const swellRadius = radius * 1.1;
-      
+      ctx.globalCompositeOperation = 'source-over';
+      const swellIntensity = bruise.intensity;
+      const swellRadius = maxRadius * 1.1;
       const swellGradient = ctx.createRadialGradient(
-        centerX - swellRadius * 0.2, centerY - swellRadius * 0.2, swellRadius * 0.1, 
+        centerX - swellRadius * 0.25, centerY - swellRadius * 0.25, swellRadius * 0.05, 
         centerX, centerY, swellRadius
       );
-      // Subtle highlight on one side and shadow on the other to give a 3D feel
-      swellGradient.addColorStop(0, `rgba(255, 255, 255, ${0.08 * swellIntensity})`); // Highlight
+      swellGradient.addColorStop(0, `rgba(255, 255, 255, ${0.15 * swellIntensity})`);
       swellGradient.addColorStop(0.5, `rgba(255, 255, 255, 0)`);
-      swellGradient.addColorStop(1, `rgba(0, 0, 0, ${0.12 * swellIntensity})`); // Shadow
+      swellGradient.addColorStop(1, `rgba(0, 0, 0, ${0.20 * swellIntensity})`);
 
       ctx.fillStyle = swellGradient;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, swellRadius, 0, Math.PI * 2);
+      createSmoothIrregularPath(bruise.shapePoints, 1.1); // Swell path is slightly larger
       ctx.fill();
 
       ctx.restore();
@@ -527,17 +550,35 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'fistPunch') {
+      const radius = (0.02 + (strength / 100) * 0.08) * (0.8 + Math.random() * 0.4);
+
+      // Generate random shape points for a more irregular, blob-like shape
+      const shapePoints: { x: number; y: number }[] = [];
+      const numPoints = Math.floor(8 + Math.random() * 5); // 8 to 12 points
+      const angleStep = (Math.PI * 2) / numPoints;
+      
+      for (let i = 0; i < numPoints; i++) {
+        // Perturb both angle and radius for a more irregular shape
+        const angle = i * angleStep + (Math.random() - 0.5) * angleStep * 0.7; // Increased angle perturbation
+        const pointRadius = radius * (0.6 + Math.random() * 0.8); // 60% to 140% of base radius, more variance
+        shapePoints.push({
+          x: Math.cos(angle) * pointRadius,
+          y: Math.sin(angle) * pointRadius,
+        });
+      }
+
       const newBruise: Bruise = {
           x: pos.x,
           y: pos.y,
-          radius: (0.02 + (strength / 100) * 0.08) * (0.8 + Math.random() * 0.4),
+          radius: radius,
+          shapePoints,
           rotation: Math.random() * Math.PI * 2,
           intensity: strength / 100,
       };
       setBruises(prev => [...prev, newBruise]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
-  }
+    }
   };
   
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {

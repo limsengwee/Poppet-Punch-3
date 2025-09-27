@@ -39,9 +39,10 @@ export interface Needle {
 export interface Bruise {
   x: number;
   y: number;
-  radius: number;
+  radius: number; // Base size for effect calculations
   rotation: number;
   intensity: number; // 0 to 1
+  shapePoints: { x: number; y: number }[];
 }
 
 export interface ImageDimensions {
