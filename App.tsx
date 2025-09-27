@@ -1,10 +1,8 @@
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Crack } from './types';
 import { detectFace } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, DistortIcon, RestartIcon, BroomIcon, CrackIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -34,7 +32,7 @@ const tools = [
     { id: 'fistPunch', name: '水泡', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
-    { id: 'ribbon', name: '彩带', icon: SparkleIcon },
+    { id: 'crack', name: '裂纹', icon: CrackIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
     { id: 'distort', name: '扭曲', icon: DistortIcon },
@@ -50,6 +48,7 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
+  const [cracks, setCracks] = useState<Crack[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -77,6 +76,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -98,6 +98,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setHitCount(0);
   }, []);
 
@@ -341,8 +342,117 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
+    cracks.forEach(crack => {
+      const originX = offsetX + crack.x * finalWidth;
+      const originY = offsetY + crack.y * finalHeight;
+      
+      let seed = crack.seed;
+      const random = () => {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+      };
 
-  }, [dents, spiders, needles, bruises]);
+      const maxSegments = 12 + Math.floor(crack.strength / 8);
+      const initialLength = (0.02 + (crack.strength / 100) * 0.08) * Math.min(finalWidth, finalHeight);
+      const initialWidth = 1 + (crack.strength / 100) * 5;
+      const branchProbability = 0.3 + crack.strength / 250;
+      
+      const segments: {x1: number, y1: number, x2: number, y2: number, width: number, life: number}[] = [];
+      const queue = [{
+        x: originX,
+        y: originY,
+        angle: crack.initialAngle,
+        length: initialLength,
+        width: initialWidth,
+        life: 1.0
+      }];
+      
+      let segmentsCreated = 0;
+      while(queue.length > 0 && segmentsCreated < maxSegments) {
+        const current = queue.shift()!;
+        
+        const angleJitter = (random() - 0.5) * 1.0;
+        const nextAngle = current.angle + angleJitter;
+        const nextLength = current.length * (0.85 + random() * 0.15);
+        
+        const nextX = current.x + Math.cos(nextAngle) * current.length;
+        const nextY = current.y + Math.sin(nextAngle) * current.length;
+
+        segments.push({x1: current.x, y1: current.y, x2: nextX, y2: nextY, width: current.width, life: current.life});
+        segmentsCreated++;
+
+        if (nextLength > 2) {
+          queue.push({
+            x: nextX,
+            y: nextY,
+            angle: nextAngle,
+            length: nextLength,
+            width: current.width * 0.9,
+            life: current.life * 0.95
+          });
+        }
+        
+        if (random() < branchProbability && nextLength > 5) {
+          const branchAngle = nextAngle + (random() > 0.5 ? 1 : -1) * (Math.PI / 3 + (random() - 0.5) * 0.4);
+           queue.push({
+            x: nextX,
+            y: nextY,
+            angle: branchAngle,
+            length: nextLength * 0.5,
+            width: current.width * 0.6,
+            life: current.life * 0.9
+          });
+        }
+      }
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Pass 1: The main, wide, soft indentation (sunken look).
+      ctx.globalCompositeOperation = 'multiply';
+      segments.forEach(seg => {
+        ctx.beginPath();
+        ctx.moveTo(seg.x1, seg.y1);
+        ctx.lineTo(seg.x2, seg.y2);
+        ctx.strokeStyle = `rgba(80, 50, 40, ${0.35 * seg.life})`;
+        ctx.lineWidth = seg.width * 2.5;
+        ctx.stroke();
+      });
+
+      // Pass 2: The raised, dry edges (3D effect).
+      ctx.globalCompositeOperation = 'soft-light';
+      segments.forEach(seg => {
+        const angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1);
+        const offsetX = Math.sin(angle) * (seg.width * 0.7);
+        const offsetY = -Math.cos(angle) * (seg.width * 0.7);
+        
+        ctx.beginPath();
+        ctx.moveTo(seg.x1 + offsetX, seg.y1 + offsetY);
+        ctx.lineTo(seg.x2 + offsetX, seg.y2 + offsetY);
+        ctx.moveTo(seg.x1 - offsetX, seg.y1 - offsetY);
+        ctx.lineTo(seg.x2 - offsetX, seg.y2 - offsetY);
+        
+        ctx.strokeStyle = `rgba(255, 240, 230, ${0.4 * seg.life})`;
+        ctx.lineWidth = seg.width * 1.2;
+        ctx.stroke();
+      });
+
+      // Pass 3: The deep, central fissure (sharp definition).
+      ctx.globalCompositeOperation = 'multiply';
+      segments.forEach(seg => {
+        ctx.beginPath();
+        ctx.moveTo(seg.x1, seg.y1);
+        ctx.lineTo(seg.x2, seg.y2);
+        ctx.strokeStyle = `rgba(50, 25, 15, ${0.7 * seg.life})`;
+        ctx.lineWidth = seg.width * 0.5;
+        ctx.stroke();
+      });
+
+      ctx.restore();
+    });
+
+  }, [dents, spiders, needles, bruises, cracks]);
 
   useEffect(() => {
     const image = imageRef.current;
@@ -428,6 +538,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -566,6 +677,18 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
+    } else if (activeTool === 'crack') {
+        const newCrack: Crack = {
+            id: performance.now(),
+            x: pos.x,
+            y: pos.y,
+            strength: strength,
+            seed: Math.random(),
+            initialAngle: Math.random() * Math.PI * 2,
+        };
+        setCracks(prev => [...prev, newCrack]);
+        setHitCount(prev => prev + 1);
+        setCoins(prev => prev + 5);
     }
   };
   
@@ -598,7 +721,7 @@ const App: React.FC = () => {
   
   const getCursor = () => {
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch') && imageSrc) return 'crosshair';
+      if ((activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'crack') && imageSrc) return 'crosshair';
       return 'default';
   }
 
@@ -707,7 +830,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && cracks.length === 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />
