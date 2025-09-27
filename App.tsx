@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
-import { detectFace, applyCrackedEffectAI } from './services/geminiService';
+import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -34,7 +33,7 @@ const tools = [
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'shatter', name: '碎裂', icon: CrackIcon },
-    { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
+    { id: 'ugly', name: '丑化', icon: UglyIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
     { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
 ];
@@ -582,12 +581,11 @@ const App: React.FC = () => {
     redrawCanvas();
   };
 
-    const handleAICrackEffect = async () => {
+    const handleAIEffect = async (promptGenerator: (strength: number) => string) => {
         if (!offscreenCanvasRef.current || !imageFile) return;
 
         setIsLoading(true);
         setError(null);
-        // Clear other effects for a clean slate for the AI
         setDents([]);
         setSpiders([]);
         setNeedles([]);
@@ -599,14 +597,9 @@ const App: React.FC = () => {
                 throw new Error("Could not get image data from canvas.");
             }
 
-            let prompt = "Transform the person's skin into a cracked, dry earth texture. The cracks should be noticeable and deep. The skin should look weathered. Preserve the original color and detail of the eyes.";
-            if (strength <= 33) {
-                prompt = "Apply a subtle network of fine, hair-like cracks to the person's skin, making it look like delicate, aging porcelain. Preserve the original color and detail of the eyes.";
-            } else if (strength >= 67) {
-                prompt = "Apply a hyper-realistic, heavily shattered stone texture to the person's skin. Create deep, dark chasms and a desaturated, greyish, rocky appearance. Make the effect dramatic but preserve the original color and detail of the eyes perfectly.";
-            }
+            const prompt = promptGenerator(strength);
             
-            const resultBase64 = await applyCrackedEffectAI(base64ImageData, imageFile.type, prompt);
+            const resultBase64 = await applyGenerativeImageEffect(base64ImageData, imageFile.type, prompt);
 
             if (resultBase64) {
                 const newImage = new Image();
@@ -717,7 +710,27 @@ const App: React.FC = () => {
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
     } else if (activeTool === 'shatter') {
-        handleAICrackEffect();
+        const promptGenerator = (strength: number) => {
+             let prompt = "Transform the person's skin into a cracked, dry earth texture. The cracks should be noticeable and deep. The skin should look weathered. Preserve the original color and detail of the eyes.";
+            if (strength <= 33) {
+                prompt = "Apply a subtle network of fine, hair-like cracks to the person's skin, making it look like delicate, aging porcelain. Preserve the original color and detail of the eyes.";
+            } else if (strength >= 67) {
+                prompt = "Apply a hyper-realistic, heavily shattered stone texture to the person's skin. Create deep, dark chasms and a desaturated, greyish, rocky appearance. Make the effect dramatic but preserve the original color and detail of the eyes perfectly.";
+            }
+            return prompt;
+        };
+        handleAIEffect(promptGenerator);
+    } else if (activeTool === 'ugly') {
+        const promptGenerator = (strength: number) => {
+            if (strength <= 33) {
+                return "Make the person in this image look slightly more menacing and unattractive. Add subtle, unflattering features like a crooked smile or unsettling eyes.";
+            } else if (strength <= 66) {
+                return "Transform the person in this image to look ugly and evil. Give them a villainous appearance with harsh features, a sinister expression, and perhaps some minor scars or blemishes.";
+            } else {
+                return "Dramatically transform the person in this image into a grotesque and evil-looking creature. Use features like twisted expressions, monstrous blemishes, dark, soulless eyes, and an overall horrifying appearance.";
+            }
+        };
+        handleAIEffect(promptGenerator);
     }
   };
   
@@ -785,7 +798,7 @@ const App: React.FC = () => {
   const getCursor = () => {
       if (!imageSrc) return 'default';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'shatter') return 'crosshair';
+      if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly'].includes(activeTool)) return 'crosshair';
       if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
       return 'default';
   }
@@ -857,7 +870,9 @@ const App: React.FC = () => {
                             <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-10">
                                 <SpinnerIcon className="w-12 h-12 text-yellow-400" />
                                 <p className="mt-4 text-lg font-semibold animate-pulse">
-                                  {activeTool === 'shatter' ? 'AI 正在生成裂纹...' : 'Detecting face...'}
+                                  {activeTool === 'shatter' ? 'AI 正在生成裂纹...' :
+                                   activeTool === 'ugly' ? 'AI 正在丑化...' :
+                                   'Detecting face...'}
                                 </p>
                             </div>
                         )}

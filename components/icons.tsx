@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 // Fix: Updated MalletIcon props to accept standard SVG props like `style`, resolving the TypeScript error. The hardcoded transform was removed to fix a style override bug.
@@ -77,10 +76,10 @@ export const FistIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
-export const SparkleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M12 18L10.25 14.25L6.5 12.5L10.25 10.75L12 7L13.75 10.75L17.5 12.5L13.75 14.25L12 18ZM18 12L16.75 9.25L14 8L16.75 6.75L18 4L19.25 6.75L22 8L19.25 9.25L18 12Z" />
-  </svg>
+export const UglyIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM8.87 8.13c.62 0 1.12.51 1.12 1.12s-.5 1.12-1.12 1.12-1.12-.5-1.12-1.12.5-1.12 1.12-1.12zm6.25 0c.62 0 1.12.51 1.12 1.12s-.5 1.12-1.12 1.12-1.12-.5-1.12-1.12.5-1.12 1.12-1.12zm-8.23 7.31c.46-.57 1.12-1.03 1.9-1.37.78-.34 1.66-.51 2.59-.51s1.81.17 2.59.51c.78.34 1.44.8 1.9 1.37.2.25.49.31.76.15.27-.16.42-.48.36-.79-.58-2.92-2.9-5.12-5.61-5.12s-5.03 2.2-5.61 5.12c-.06.31.09.63.36.79.27.16.57.1.76-.15z"/>
+    </svg>
 );
 
 export const CrackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (

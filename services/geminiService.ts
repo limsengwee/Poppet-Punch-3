@@ -12,7 +12,7 @@ function base64ToGenerativePart(data: string, mimeType: string) {
   };
 }
 
-export async function applyCrackedEffectAI(
+export async function applyGenerativeImageEffect(
   base64ImageData: string,
   mimeType: string,
   prompt: string
@@ -39,7 +39,7 @@ export async function applyCrackedEffectAI(
         }
         return null;
     } catch (error) {
-        console.error("Error applying AI crack effect:", error);
+        console.error("Error applying AI image effect:", error);
         return null;
     }
 }
