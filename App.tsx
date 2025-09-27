@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
-import { detectFace, applyCracksWithAI } from './services/geminiService';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Crack } from './types';
+import { detectFace } from './services/geminiService';
 import { 
     MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon 
 } from './components/icons';
@@ -33,13 +33,23 @@ const tools = [
     { id: 'fistPunch', name: '水泡', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
-    { id: 'crack', name: '裂纹', icon: CrackIcon },
+    { id: 'shatter', name: '碎裂', icon: CrackIcon },
     { id: 'rainbow', name: '彩虹', icon: SparkleIcon },
     { id: 'lightning', name: '闪电', icon: LightningIcon },
     { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
 ];
 
 type ToolId = typeof tools[number]['id'];
+
+// Seeded random number generator for procedural generation
+function mulberry32(a: number) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
 
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -49,8 +59,8 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
+  const [cracks, setCracks] = useState<Crack[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isAiProcessing, setIsAiProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
   const [mousePosition, setMousePosition] = useState<{ x: number, y: number } | null>(null);
@@ -60,6 +70,7 @@ const App: React.FC = () => {
   const [hitCount, setHitCount] = useState<number>(0);
   const [activeTool, setActiveTool] = useState<ToolId>('mallet');
   const [strength, setStrength] = useState<number>(50);
+  const [hasDestructiveChanges, setHasDestructiveChanges] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -267,7 +278,107 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-  }, [dents, spiders, needles, bruises]);
+    cracks.forEach(crack => {
+      if (!crack.color) return;
+      const { r, g, b } = crack.color;
+
+      const centerX = offsetX + crack.x * finalWidth;
+      const centerY = offsetY + crack.y * finalHeight;
+      const random = mulberry32(crack.seed * 10000);
+
+      const shadowColor = `rgba(${r * 0.5}, ${g * 0.5}, ${b * 0.5}, 0.6)`;
+      const fissureColor = `rgba(${r * 0.4}, ${g * 0.4}, ${b * 0.4}, 0.8)`;
+      const highlightColor = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, 0.4)`;
+
+      const paths: { path: Path2D, width: number }[] = [];
+      const tips = [{x: centerX, y: centerY, angle: random() * Math.PI * 2}];
+      const maxSegments = Math.floor(15 + (crack.strength / 100) * 80);
+      const maxSegmentLength = 0.3 + (crack.strength / 100) * 7;
+      const maxDistance = 0.015 + (crack.strength / 100) * 0.06;
+
+      for (let i = 0; i < maxSegments && tips.length > 0; i++) {
+        const tipIndex = Math.floor(random() * tips.length);
+        const tip = tips[tipIndex];
+
+        const angle = tip.angle + (random() - 0.5) * 1.8;
+        const length = (random() * 0.5 + 0.5) * maxSegmentLength;
+        
+        const newX = tip.x + Math.cos(angle) * length;
+        const newY = tip.y + Math.sin(angle) * length;
+
+        const relativeX = (newX - offsetX) / finalWidth;
+        const relativeY = (newY - offsetY) / finalHeight;
+        const distanceFromCenter = Math.sqrt(Math.pow(relativeX - crack.x, 2) + Math.pow(relativeY - crack.y, 2));
+
+        if (distanceFromCenter > maxDistance) {
+            tips.splice(tipIndex, 1);
+            continue;
+        }
+
+        const path = new Path2D();
+        path.moveTo(tip.x, tip.y);
+        const dx = newX - tip.x;
+        const dy = newY - tip.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const pathAngle = Math.atan2(dy, dx);
+        const numSubSegments = Math.max(2, Math.floor(dist / 2));
+        
+        let currentX = tip.x;
+        let currentY = tip.y;
+        for (let j = 1; j <= numSubSegments; j++) {
+            const subLength = dist / numSubSegments;
+            const wanderAngle = (random() - 0.5) * 0.7;
+            const nextX = currentX + Math.cos(pathAngle + wanderAngle) * subLength;
+            const nextY = currentY + Math.sin(pathAngle + wanderAngle) * subLength;
+            path.lineTo(nextX, nextY);
+            currentX = nextX;
+            currentY = nextY;
+        }
+        
+        const width = Math.max(0.3, (1 - (distanceFromCenter / maxDistance)) * (0.5 + (crack.strength / 100) * 1.5));
+        paths.push({ path, width });
+        
+        tip.x = newX;
+        tip.y = newY;
+        tip.angle = angle;
+
+        if (random() < 0.1 + (crack.strength / 100) * 0.25) {
+            tips.push({ x: newX, y: newY, angle: angle + (random() - 0.5) * Math.PI });
+        }
+        if (random() > 0.8) {
+            tips.splice(tipIndex, 1);
+        }
+      }
+      
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      paths.forEach(({ path, width }) => {
+        // Pass 1: Indentation/shadow.
+        ctx.strokeStyle = shadowColor;
+        ctx.lineWidth = width * 2.0;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.stroke(path);
+
+        // Pass 2: Raised edge/highlight.
+        ctx.strokeStyle = highlightColor;
+        ctx.lineWidth = width * 0.6;
+        ctx.globalCompositeOperation = 'soft-light';
+        ctx.save();
+        ctx.translate(-0.5, -0.5);
+        ctx.stroke(path);
+        ctx.restore();
+
+        // Pass 3: The fissure itself.
+        ctx.strokeStyle = fissureColor;
+        ctx.lineWidth = width * 0.8;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.stroke(path);
+      });
+
+      ctx.globalCompositeOperation = 'source-over';
+    });
+
+  }, [dents, spiders, needles, bruises, cracks]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -280,12 +391,14 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
     setMousePosition(null);
     setHitCount(0);
     setCoins(480); // Reset coins to initial value
+    setHasDestructiveChanges(false);
     if(fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -302,13 +415,17 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setHitCount(0);
+    setHasDestructiveChanges(false);
 
     const offscreenCanvas = offscreenCanvasRef.current;
     const image = imageRef.current;
     if (offscreenCanvas && image && image.complete) {
         const offscreenCtx = offscreenCanvas.getContext('2d');
         if (offscreenCtx) {
+            offscreenCanvas.width = image.naturalWidth;
+            offscreenCanvas.height = image.naturalHeight;
             offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
             offscreenCtx.drawImage(image, 0, 0);
             redrawCanvas();
@@ -465,6 +582,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setCracks([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -574,50 +692,9 @@ const App: React.FC = () => {
     }
     
     offscreenCtx.putImageData(warpedData, startX, startY);
+    setHasDestructiveChanges(true);
     redrawCanvas();
   };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = error => reject(error);
-    });
-  };
-
-  const handleApplyCracks = async () => {
-      if (!imageFile || isAiProcessing) return;
-
-      setIsAiProcessing(true);
-      setError(null);
-
-      try {
-          const base64Data = await fileToBase64(imageFile);
-          const newBase64 = await applyCracksWithAI(base64Data, imageFile.type, strength);
-          
-          if (newBase64) {
-              const newMimeType = 'image/png';
-              const newImageSrc = `data:${newMimeType};base64,${newBase64}`;
-              
-              const blob = await (await fetch(newImageSrc)).blob();
-              const newFile = new File([blob], imageFile.name, { type: newMimeType });
-
-              setImageFile(newFile);
-              setImageSrc(newImageSrc); 
-              setHitCount(prev => prev + 1);
-              setCoins(prev => prev + 25);
-          } else {
-              setError("AI 无法生成效果，请重试。");
-          }
-      } catch (e) {
-          console.error(e);
-          setError("应用 AI 效果时出错。");
-      } finally {
-          setIsAiProcessing(false);
-      }
-  };
-
 
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
@@ -700,12 +777,55 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
+    } else if (activeTool === 'shatter') {
+        const offscreenCanvas = offscreenCanvasRef.current;
+        if (!offscreenCanvas) return;
+        
+        const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+        if (!offscreenCtx) return;
+    
+        const { finalWidth, finalHeight, offsetX, offsetY } = renderInfo.current;
+        const imageX = Math.round(((pos.absoluteX - offsetX) / finalWidth) * offscreenCanvas.width);
+        const imageY = Math.round(((pos.absoluteY - offsetY) / finalHeight) * offscreenCanvas.height);
+        
+        const sampleSize = 5;
+        const halfSample = Math.floor(sampleSize / 2);
+        // Clamp coordinates to be within the canvas bounds
+        const sampleX = Math.max(0, Math.min(imageX - halfSample, offscreenCanvas.width - sampleSize));
+        const sampleY = Math.max(0, Math.min(imageY - halfSample, offscreenCanvas.height - sampleSize));
+    
+        const pixelDataBlock = offscreenCtx.getImageData(sampleX, sampleY, sampleSize, sampleSize).data;
+        let rAvg = 0, gAvg = 0, bAvg = 0, count = 0;
+        for (let i = 0; i < pixelDataBlock.length; i += 4) {
+            rAvg += pixelDataBlock[i];
+            gAvg += pixelDataBlock[i + 1];
+            bAvg += pixelDataBlock[i + 2];
+            count++;
+        }
+    
+        const sampledColor = {
+            r: Math.floor(rAvg / count),
+            g: Math.floor(gAvg / count),
+            b: Math.floor(bAvg / count),
+        };
+    
+        const newCrack: Crack = {
+            id: performance.now(),
+            x: pos.x,
+            y: pos.y,
+            strength: strength,
+            seed: Math.random(),
+            color: sampledColor,
+        };
+        setCracks(prev => [...prev, newCrack]);
+        setHitCount(prev => prev + 1);
+        setCoins(prev => prev + 10);
     }
   };
   
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const pos = getPosOnImage(event);
-    if (!pos || !imageSrc || isLoading || activeTool === 'crack') return;
+    if (!pos || !imageSrc || isLoading) return;
 
     let canHit = false;
     if (faceBox) {
@@ -767,9 +887,8 @@ const App: React.FC = () => {
   const getCursor = () => {
       if (!imageSrc) return 'default';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch') return 'crosshair';
+      if (activeTool === 'voodooSpider' || activeTool === 'voodooNeedle' || activeTool === 'fistPunch' || activeTool === 'shatter') return 'crosshair';
       if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
-      if (activeTool === 'crack') return 'default';
       return 'default';
   }
 
@@ -836,11 +955,11 @@ const App: React.FC = () => {
                         <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
                         <AnimatedMalletCursor position={mousePosition} visible={isHoveringFace} />
                         
-                        {(isLoading || isAiProcessing) && (
+                        {isLoading && (
                             <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-10">
                                 <SpinnerIcon className="w-12 h-12 text-yellow-400" />
                                 <p className="mt-4 text-lg font-semibold animate-pulse">
-                                  {isLoading ? 'Detecting face...' : 'AI 正在生成效果...'}
+                                  {activeTool === 'shatter' ? 'AI 正在生成裂纹...' : 'Detecting face...'}
                                 </p>
                             </div>
                         )}
@@ -878,24 +997,11 @@ const App: React.FC = () => {
                         onChange={(e) => setStrength(Number(e.target.value))}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                     />
-                     {activeTool === 'crack' && (
-                        <div className="mt-4 flex flex-col items-center gap-3">
-                            <p className="text-xs text-center text-slate-400">AI效果将应用于整个面部。强度越高，裂纹越明显。</p>
-                            <button 
-                                onClick={handleApplyCracks}
-                                disabled={isAiProcessing || !imageFile}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-yellow-600 text-slate-900 font-bold rounded-lg hover:bg-yellow-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
-                            >
-                                {isAiProcessing ? <SpinnerIcon className="w-5 h-5" /> : <SparkleIcon className="w-5 h-5" />}
-                                应用裂纹效果
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 }
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && cracks.length === 0 && !hasDestructiveChanges}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

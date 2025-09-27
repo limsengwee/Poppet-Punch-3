@@ -85,7 +85,7 @@ export const SparkleIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 
 export const CrackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
-        <path d="M12 3V9.5M12 14.5V21M12 9.5L7 7L4 9M12 9.5L17 7L20 9M12 14.5L7 17L4 15M12 14.5L17 17L20 15" />
+        <path d="M19.25 8.5l-6.75 4-6.75-4-1.75 8h17l-1.75-8zM12.5 12.5l5.25 8.25M11.5 12.5L6.25 20.75M12.5 3v9.5" />
     </svg>
 );
 
