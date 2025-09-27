@@ -286,15 +286,15 @@ const App: React.FC = () => {
       const centerY = offsetY + crack.y * finalHeight;
       const random = mulberry32(crack.seed * 10000);
 
-      const shadowColor = `rgba(${r * 0.5}, ${g * 0.5}, ${b * 0.5}, 0.6)`;
-      const fissureColor = `rgba(${r * 0.4}, ${g * 0.4}, ${b * 0.4}, 0.8)`;
+      const shadowColor = `rgba(${r * 0.8}, ${g * 0.8}, ${b * 0.8}, 0.5)`;
+      const fissureColor = `rgba(${r * 0.7}, ${g * 0.7}, ${b * 0.7}, 0.7)`;
       const highlightColor = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, 0.4)`;
 
       const paths: { path: Path2D, width: number }[] = [];
       const tips = [{x: centerX, y: centerY, angle: random() * Math.PI * 2}];
       const maxSegments = Math.floor(15 + (crack.strength / 100) * 80);
       const maxSegmentLength = 0.3 + (crack.strength / 100) * 7;
-      const maxDistance = 0.015 + (crack.strength / 100) * 0.06;
+      const maxDistance = 0.01 + (crack.strength / 100) * 0.04;
 
       for (let i = 0; i < maxSegments && tips.length > 0; i++) {
         const tipIndex = Math.floor(random() * tips.length);
