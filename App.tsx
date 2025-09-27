@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
 import { detectFace } from './services/geminiService';
@@ -30,7 +31,7 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
-    { id: 'fistPunch', name: '重拳', icon: FistIcon },
+    { id: 'fistPunch', name: '水泡', icon: FistIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'ribbon', name: '彩带', icon: SparkleIcon },
@@ -277,76 +278,69 @@ const App: React.FC = () => {
     bruises.forEach(bruise => {
       const centerX = offsetX + bruise.x * finalWidth;
       const centerY = offsetY + bruise.y * finalHeight;
-      const scale = Math.min(finalWidth, finalHeight);
+      const radiusX = bruise.radius * bruise.aspectRatio * Math.min(finalWidth, finalHeight);
+      const radiusY = bruise.radius * Math.min(finalWidth, finalHeight);
+      const intensity = bruise.intensity;
 
       ctx.save();
-      
-      // Helper to draw a smooth, irregular path from points.
-      const createSmoothIrregularPath = (points: {x:number, y:number}[], pathScale: number = 1) => {
-          // Fallback to circle if no points are available
-          if (!points || points.length < 3) {
-              const fallbackRadius = bruise.radius * scale * pathScale;
-              ctx.beginPath();
-              ctx.arc(centerX, centerY, fallbackRadius, 0, Math.PI * 2);
-              ctx.closePath();
-              return;
-          };
 
-          const scaledPoints = points.map(p => ({
-              x: centerX + p.x * scale * pathScale,
-              y: centerY + p.y * scale * pathScale,
-          }));
-          
-          ctx.beginPath();
-          // Start at the midpoint of the last and first points
-          ctx.moveTo(
-              (scaledPoints[0].x + scaledPoints[scaledPoints.length - 1].x) / 2,
-              (scaledPoints[0].y + scaledPoints[scaledPoints.length - 1].y) / 2
-          );
-
-          // Use quadratic curves to create a smooth, blob-like shape
-          for (let i = 0; i < scaledPoints.length; i++) {
-              const p1 = scaledPoints[i];
-              const p2 = scaledPoints[(i + 1) % scaledPoints.length];
-              ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-          }
-          ctx.closePath();
-      };
-      
-      // Use the bruise's base radius to define the gradient size, expanded to cover the whole shape.
-      const maxRadius = bruise.radius * 1.3 * scale; 
-
-      // --- 1. Draw Bruise Colors with Blending ---
-      ctx.globalCompositeOperation = 'multiply';
-      const intensity = bruise.intensity;
-      const bruiseGradient = ctx.createRadialGradient(centerX, centerY, maxRadius * 0.2, centerX, centerY, maxRadius);
-      bruiseGradient.addColorStop(0, `rgba(20, 10, 50, ${0.5 * intensity})`);
-      bruiseGradient.addColorStop(0.5, `rgba(90, 20, 60, ${0.4 * intensity})`);
-      bruiseGradient.addColorStop(0.9, `rgba(100, 90, 30, ${0.3 * intensity})`);
-      bruiseGradient.addColorStop(1, `rgba(100, 90, 30, 0)`);
-      
-      ctx.fillStyle = bruiseGradient;
-      createSmoothIrregularPath(bruise.shapePoints, 1.0);
+      // 1. Irritated skin base
+      ctx.globalCompositeOperation = 'overlay';
+      const irritationRadius = Math.max(radiusX, radiusY) * 2.5;
+      const irritationGradient = ctx.createRadialGradient(
+          centerX, centerY, 0,
+          centerX, centerY, irritationRadius
+      );
+      irritationGradient.addColorStop(0, `rgba(220, 80, 80, ${0.35 * intensity})`);
+      irritationGradient.addColorStop(0.5, `rgba(200, 100, 100, ${0.2 * intensity})`);
+      irritationGradient.addColorStop(1, 'rgba(200, 100, 100, 0)');
+      ctx.fillStyle = irritationGradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, irritationRadius, 0, 2 * Math.PI);
       ctx.fill();
 
-      // --- 2. Draw Swelling Effect (Overlay) ---
-      ctx.globalCompositeOperation = 'source-over';
-      const swellIntensity = bruise.intensity;
-      const swellRadius = maxRadius * 1.1;
-      const swellGradient = ctx.createRadialGradient(
-        centerX - swellRadius * 0.25, centerY - swellRadius * 0.25, swellRadius * 0.05, 
-        centerX, centerY, swellRadius
-      );
-      swellGradient.addColorStop(0, `rgba(255, 255, 255, ${0.15 * swellIntensity})`);
-      swellGradient.addColorStop(0.5, `rgba(255, 255, 255, 0)`);
-      swellGradient.addColorStop(1, `rgba(0, 0, 0, ${0.20 * swellIntensity})`);
+      // Create main ellipse path
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radiusX, radiusY, bruise.rotation, 0, 2 * Math.PI);
 
-      ctx.fillStyle = swellGradient;
-      createSmoothIrregularPath(bruise.shapePoints, 1.1); // Swell path is slightly larger
+      // 2. Inner shadow for depth
+      ctx.globalCompositeOperation = 'multiply';
+      const shadowGradient = ctx.createRadialGradient(
+          centerX + radiusX * 0.3, centerY + radiusY * 0.3, 0,
+          centerX, centerY, Math.max(radiusX, radiusY) * 1.5
+      );
+      shadowGradient.addColorStop(0, 'rgba(100, 40, 40, 0)');
+      shadowGradient.addColorStop(1, `rgba(100, 40, 40, ${0.4 * intensity})`);
+      ctx.fillStyle = shadowGradient;
+      ctx.fill();
+
+      // 3. Blister Body fill (the liquid)
+      ctx.globalCompositeOperation = 'soft-light';
+      const bodyGradient = ctx.createRadialGradient(
+          centerX - radiusX * 0.3, centerY - radiusY * 0.3, 0,
+          centerX, centerY, Math.max(radiusX, radiusY)
+      );
+      bodyGradient.addColorStop(0, `rgba(255, 250, 220, ${0.9 * intensity})`);
+      bodyGradient.addColorStop(1, `rgba(255, 220, 200, ${0.6 * intensity})`);
+      ctx.fillStyle = bodyGradient;
+      ctx.fill();
+      
+      // 4. Glossy Highlight
+      ctx.globalCompositeOperation = 'overlay';
+      const highlightRadius = Math.max(radiusX, radiusY);
+      const highlightGradient = ctx.createRadialGradient(
+          centerX - radiusX * 0.4, centerY - radiusY * 0.4, 0,
+          centerX - radiusX * 0.4, centerY - radiusY * 0.4, highlightRadius * 0.7
+      );
+      highlightGradient.addColorStop(0, `rgba(255, 255, 255, ${0.9 * intensity})`);
+      highlightGradient.addColorStop(0.3, `rgba(255, 255, 255, ${0.7 * intensity})`);
+      highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = highlightGradient;
       ctx.fill();
 
       ctx.restore();
     });
+
 
   }, [dents, spiders, needles, bruises]);
 
@@ -501,7 +495,7 @@ const App: React.FC = () => {
         const shadowColor = `rgba(${Math.max(0, r-50)}, ${Math.max(0, g-50)}, ${Math.max(0, b-50)}, 0.5)`;
         const highlightColor = `rgba(${Math.min(255, r+50)}, ${Math.min(255, g+50)}, ${Math.min(255, b+50)}, 0.5)`;
         
-        const baseRadius = 0.01 + (strength / 100) * 0.04;
+        const baseRadius = 0.02 + (strength / 100) * 0.04;
         const randomFactor = Math.random() * 0.01;
 
         const newDent: Dent = {
@@ -514,7 +508,7 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooSpider') {
-        const baseSize = 0.005 + (strength / 100) * 0.02;
+        const baseSize = 0.015 + (strength / 100) * 0.02;
         const randomFactor = Math.random() * 0.005;
 
         const newSpider: Spider = {
@@ -532,8 +526,8 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooNeedle') {
-        const minLength = 0.02;
-        const maxLength = 0.1;
+        const minLength = 0.03;
+        const maxLength = 0.12;
         const length = minLength + (strength / 100) * (maxLength - minLength);
 
         const voodooColors = ['#ef4444', '#f97316', '#facc15', '#4ade80', '#3b82f6', '#a855f7'];
@@ -550,32 +544,26 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'fistPunch') {
-      const radius = (0.02 + (strength / 100) * 0.08) * (0.8 + Math.random() * 0.4);
+      const numBlisters = 1 + Math.floor((strength / 100) * 4);
+      const newBruises: Bruise[] = [];
+      const clusterRadius = 0.02 + (strength / 100) * 0.04;
 
-      // Generate random shape points for a more irregular, blob-like shape
-      const shapePoints: { x: number; y: number }[] = [];
-      const numPoints = Math.floor(8 + Math.random() * 5); // 8 to 12 points
-      const angleStep = (Math.PI * 2) / numPoints;
-      
-      for (let i = 0; i < numPoints; i++) {
-        // Perturb both angle and radius for a more irregular shape
-        const angle = i * angleStep + (Math.random() - 0.5) * angleStep * 0.7; // Increased angle perturbation
-        const pointRadius = radius * (0.6 + Math.random() * 0.8); // 60% to 140% of base radius, more variance
-        shapePoints.push({
-          x: Math.cos(angle) * pointRadius,
-          y: Math.sin(angle) * pointRadius,
-        });
+      for (let i = 0; i < numBlisters; i++) {
+          const isMain = i === 0;
+          const radius = (0.015 + (strength / 100) * 0.03) * (isMain ? 1 : (0.2 + Math.random() * 0.5));
+          const angle = Math.random() * Math.PI * 2;
+          const distance = isMain ? 0 : Math.random() * clusterRadius;
+
+          newBruises.push({
+              x: pos.x + Math.cos(angle) * distance,
+              y: pos.y + Math.sin(angle) * distance,
+              radius: radius,
+              rotation: Math.random() * Math.PI * 2,
+              aspectRatio: 1 + (Math.random() - 0.5) * 0.4,
+              intensity: strength / 100,
+          });
       }
-
-      const newBruise: Bruise = {
-          x: pos.x,
-          y: pos.y,
-          radius: radius,
-          shapePoints,
-          rotation: Math.random() * Math.PI * 2,
-          intensity: strength / 100,
-      };
-      setBruises(prev => [...prev, newBruise]);
+      setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
     }
