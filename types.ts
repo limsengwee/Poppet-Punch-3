@@ -44,12 +44,3 @@ export interface Bruise {
   intensity: number; // 0 to 1
   aspectRatio: number;
 }
-
-export interface Crack {
-  id: number;
-  x: number;
-  y: number;
-  strength: number;
-  seed: number;
-  color: { r: number, g: number, b: number };
-}

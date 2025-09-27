@@ -12,6 +12,38 @@ function base64ToGenerativePart(data: string, mimeType: string) {
   };
 }
 
+export async function applyCrackedEffectAI(
+  base64ImageData: string,
+  mimeType: string,
+  prompt: string
+): Promise<string | null> {
+    try {
+        const imagePart = base64ToGenerativePart(base64ImageData, mimeType);
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: {
+                parts: [
+                    imagePart,
+                    { text: prompt },
+                ],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                return part.inlineData.data;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error("Error applying AI crack effect:", error);
+        return null;
+    }
+}
+
 export async function detectFace(
   base64ImageData: string,
   mimeType: string

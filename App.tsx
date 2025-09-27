@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Crack } from './types';
-import { detectFace } from './services/geminiService';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
+import { detectFace, applyCrackedEffectAI } from './services/geminiService';
 import { 
     MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SparkleIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon 
 } from './components/icons';
@@ -41,16 +41,6 @@ const tools = [
 
 type ToolId = typeof tools[number]['id'];
 
-// Seeded random number generator for procedural generation
-function mulberry32(a: number) {
-    return function() {
-      var t = a += 0x6D2B79F5;
-      t = Math.imul(t ^ t >>> 15, t | 1);
-      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    }
-}
-
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -59,7 +49,6 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
-  const [cracks, setCracks] = useState<Crack[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -278,107 +267,7 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-    cracks.forEach(crack => {
-      if (!crack.color) return;
-      const { r, g, b } = crack.color;
-
-      const centerX = offsetX + crack.x * finalWidth;
-      const centerY = offsetY + crack.y * finalHeight;
-      const random = mulberry32(crack.seed * 10000);
-
-      const shadowColor = `rgba(${r * 0.8}, ${g * 0.8}, ${b * 0.8}, 0.5)`;
-      const fissureColor = `rgba(${r * 0.7}, ${g * 0.7}, ${b * 0.7}, 0.7)`;
-      const highlightColor = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, 0.4)`;
-
-      const paths: { path: Path2D, width: number }[] = [];
-      const tips = [{x: centerX, y: centerY, angle: random() * Math.PI * 2}];
-      const maxSegments = Math.floor(15 + (crack.strength / 100) * 80);
-      const maxSegmentLength = 0.3 + (crack.strength / 100) * 7;
-      const maxDistance = 0.01 + (crack.strength / 100) * 0.04;
-
-      for (let i = 0; i < maxSegments && tips.length > 0; i++) {
-        const tipIndex = Math.floor(random() * tips.length);
-        const tip = tips[tipIndex];
-
-        const angle = tip.angle + (random() - 0.5) * 1.8;
-        const length = (random() * 0.5 + 0.5) * maxSegmentLength;
-        
-        const newX = tip.x + Math.cos(angle) * length;
-        const newY = tip.y + Math.sin(angle) * length;
-
-        const relativeX = (newX - offsetX) / finalWidth;
-        const relativeY = (newY - offsetY) / finalHeight;
-        const distanceFromCenter = Math.sqrt(Math.pow(relativeX - crack.x, 2) + Math.pow(relativeY - crack.y, 2));
-
-        if (distanceFromCenter > maxDistance) {
-            tips.splice(tipIndex, 1);
-            continue;
-        }
-
-        const path = new Path2D();
-        path.moveTo(tip.x, tip.y);
-        const dx = newX - tip.x;
-        const dy = newY - tip.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const pathAngle = Math.atan2(dy, dx);
-        const numSubSegments = Math.max(2, Math.floor(dist / 2));
-        
-        let currentX = tip.x;
-        let currentY = tip.y;
-        for (let j = 1; j <= numSubSegments; j++) {
-            const subLength = dist / numSubSegments;
-            const wanderAngle = (random() - 0.5) * 0.7;
-            const nextX = currentX + Math.cos(pathAngle + wanderAngle) * subLength;
-            const nextY = currentY + Math.sin(pathAngle + wanderAngle) * subLength;
-            path.lineTo(nextX, nextY);
-            currentX = nextX;
-            currentY = nextY;
-        }
-        
-        const width = Math.max(0.3, (1 - (distanceFromCenter / maxDistance)) * (0.5 + (crack.strength / 100) * 1.5));
-        paths.push({ path, width });
-        
-        tip.x = newX;
-        tip.y = newY;
-        tip.angle = angle;
-
-        if (random() < 0.1 + (crack.strength / 100) * 0.25) {
-            tips.push({ x: newX, y: newY, angle: angle + (random() - 0.5) * Math.PI });
-        }
-        if (random() > 0.8) {
-            tips.splice(tipIndex, 1);
-        }
-      }
-      
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      paths.forEach(({ path, width }) => {
-        // Pass 1: Indentation/shadow.
-        ctx.strokeStyle = shadowColor;
-        ctx.lineWidth = width * 2.0;
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.stroke(path);
-
-        // Pass 2: Raised edge/highlight.
-        ctx.strokeStyle = highlightColor;
-        ctx.lineWidth = width * 0.6;
-        ctx.globalCompositeOperation = 'soft-light';
-        ctx.save();
-        ctx.translate(-0.5, -0.5);
-        ctx.stroke(path);
-        ctx.restore();
-
-        // Pass 3: The fissure itself.
-        ctx.strokeStyle = fissureColor;
-        ctx.lineWidth = width * 0.8;
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.stroke(path);
-      });
-
-      ctx.globalCompositeOperation = 'source-over';
-    });
-
-  }, [dents, spiders, needles, bruises, cracks]);
+  }, [dents, spiders, needles, bruises]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -391,7 +280,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setCracks([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -415,7 +303,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setCracks([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
 
@@ -582,7 +469,6 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setCracks([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -696,6 +582,59 @@ const App: React.FC = () => {
     redrawCanvas();
   };
 
+    const handleAICrackEffect = async () => {
+        if (!offscreenCanvasRef.current || !imageFile) return;
+
+        setIsLoading(true);
+        setError(null);
+        // Clear other effects for a clean slate for the AI
+        setDents([]);
+        setSpiders([]);
+        setNeedles([]);
+        setBruises([]);
+
+        try {
+            const base64ImageData = offscreenCanvasRef.current.toDataURL(imageFile.type).split(',')[1];
+            if (!base64ImageData) {
+                throw new Error("Could not get image data from canvas.");
+            }
+
+            let prompt = "Transform the person's skin into a cracked, dry earth texture. The cracks should be noticeable and deep. The skin should look weathered. Preserve the original color and detail of the eyes.";
+            if (strength <= 33) {
+                prompt = "Apply a subtle network of fine, hair-like cracks to the person's skin, making it look like delicate, aging porcelain. Preserve the original color and detail of the eyes.";
+            } else if (strength >= 67) {
+                prompt = "Apply a hyper-realistic, heavily shattered stone texture to the person's skin. Create deep, dark chasms and a desaturated, greyish, rocky appearance. Make the effect dramatic but preserve the original color and detail of the eyes perfectly.";
+            }
+            
+            const resultBase64 = await applyCrackedEffectAI(base64ImageData, imageFile.type, prompt);
+
+            if (resultBase64) {
+                const newImage = new Image();
+                newImage.onload = () => {
+                    const offscreenCanvas = offscreenCanvasRef.current;
+                    if (offscreenCanvas) {
+                        const offscreenCtx = offscreenCanvas.getContext('2d');
+                        offscreenCanvas.width = newImage.naturalWidth;
+                        offscreenCanvas.height = newImage.naturalHeight;
+                        offscreenCtx?.drawImage(newImage, 0, 0);
+                        setHasDestructiveChanges(true);
+                        redrawCanvas();
+                    }
+                };
+                newImage.src = `data:${imageFile.type};base64,${resultBase64}`;
+                setHitCount(prev => prev + 1);
+                setCoins(prev => prev + 10);
+            } else {
+                setError("AI failed to generate the effect. Please try again.");
+            }
+        } catch (e) {
+            console.error(e);
+            setError("An error occurred while applying the AI effect.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
@@ -778,48 +717,7 @@ const App: React.FC = () => {
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
     } else if (activeTool === 'shatter') {
-        const offscreenCanvas = offscreenCanvasRef.current;
-        if (!offscreenCanvas) return;
-        
-        const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-        if (!offscreenCtx) return;
-    
-        const { finalWidth, finalHeight, offsetX, offsetY } = renderInfo.current;
-        const imageX = Math.round(((pos.absoluteX - offsetX) / finalWidth) * offscreenCanvas.width);
-        const imageY = Math.round(((pos.absoluteY - offsetY) / finalHeight) * offscreenCanvas.height);
-        
-        const sampleSize = 5;
-        const halfSample = Math.floor(sampleSize / 2);
-        // Clamp coordinates to be within the canvas bounds
-        const sampleX = Math.max(0, Math.min(imageX - halfSample, offscreenCanvas.width - sampleSize));
-        const sampleY = Math.max(0, Math.min(imageY - halfSample, offscreenCanvas.height - sampleSize));
-    
-        const pixelDataBlock = offscreenCtx.getImageData(sampleX, sampleY, sampleSize, sampleSize).data;
-        let rAvg = 0, gAvg = 0, bAvg = 0, count = 0;
-        for (let i = 0; i < pixelDataBlock.length; i += 4) {
-            rAvg += pixelDataBlock[i];
-            gAvg += pixelDataBlock[i + 1];
-            bAvg += pixelDataBlock[i + 2];
-            count++;
-        }
-    
-        const sampledColor = {
-            r: Math.floor(rAvg / count),
-            g: Math.floor(gAvg / count),
-            b: Math.floor(bAvg / count),
-        };
-    
-        const newCrack: Crack = {
-            id: performance.now(),
-            x: pos.x,
-            y: pos.y,
-            strength: strength,
-            seed: Math.random(),
-            color: sampledColor,
-        };
-        setCracks(prev => [...prev, newCrack]);
-        setHitCount(prev => prev + 1);
-        setCoins(prev => prev + 10);
+        handleAICrackEffect();
     }
   };
   
@@ -1001,7 +899,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && cracks.length === 0 && !hasDestructiveChanges}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && !hasDestructiveChanges}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />
