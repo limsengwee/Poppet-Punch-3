@@ -160,41 +160,72 @@ const App: React.FC = () => {
         const cy = offsetY + needle.y * finalHeight;
         const length = needle.length * Math.min(finalWidth, finalHeight);
         const headRadius = 4.5;
+        const shaftWidth = 2;
 
+        // 1. Puncture Wound - more detailed
+        // Dark inner hole
+        ctx.fillStyle = 'rgba(10, 0, 0, 0.6)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, shaftWidth / 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Irritated skin around the puncture
+        const woundGradient = ctx.createRadialGradient(cx, cy, shaftWidth, cx, cy, headRadius * 2.5);
+        woundGradient.addColorStop(0, 'rgba(150, 50, 50, 0.4)');
+        woundGradient.addColorStop(0.7, 'rgba(100, 30, 30, 0.2)');
+        woundGradient.addColorStop(1, 'rgba(100, 30, 30, 0)');
+        ctx.fillStyle = woundGradient;
+        ctx.beginPath();
+        ctx.arc(cx, cy, headRadius * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 2. Needle drawing
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(needle.rotation);
-        
-        ctx.strokeStyle = '#a1a1aa';
-        ctx.lineWidth = 2;
+
+        // Shadow for the needle. Cast it away from the needle's "exit" point.
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 3;
+
+        const entryOffset = -2;
+
+        // Needle Shaft with gradient for 3D effect
+        const shaftGradient = ctx.createLinearGradient(-shaftWidth, 0, shaftWidth, 0);
+        shaftGradient.addColorStop(0, '#71717a'); // Dark edge
+        shaftGradient.addColorStop(0.4, '#e5e5e5'); // Highlight
+        shaftGradient.addColorStop(1, '#a1a1aa'); // Main color
+
+        ctx.strokeStyle = shaftGradient;
+        ctx.lineWidth = shaftWidth;
         ctx.lineCap = 'round';
         
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 3;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 2;
-        
         ctx.beginPath();
-        ctx.moveTo(0, headRadius * 0.8);
-        ctx.lineTo(0, length);
+        ctx.moveTo(0, entryOffset); // Start slightly "inside" the hole to create depth
+        ctx.lineTo(0, -length);
         ctx.stroke();
 
-        ctx.shadowColor = 'transparent';
-
+        // Needle Head
         ctx.fillStyle = needle.color;
         ctx.beginPath();
-        ctx.arc(0, 0, headRadius, 0, 2 * Math.PI);
+        ctx.arc(0, -length, headRadius, 0, Math.PI * 2);
         ctx.fill();
-        
+
+        // Reset shadow for head highlight
+        ctx.shadowColor = 'transparent';
+
+        // Highlight on the head
         const gradient = ctx.createRadialGradient(
-            -headRadius * 0.4, -headRadius * 0.4, 0,
-            -headRadius * 0.4, -headRadius * 0.4, headRadius * 1.5
+            -headRadius * 0.4, -length - headRadius * 0.4, 0,
+            -headRadius * 0.4, -length - headRadius * 0.4, headRadius * 1.5
         );
-        gradient.addColorStop(0, 'rgba(255,255,255,0.8)');
+        gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(0, 0, headRadius, 0, 2 * Math.PI);
+        ctx.arc(0, -length, headRadius, 0, 2 * Math.PI);
         ctx.fill();
         
         ctx.restore();
@@ -809,7 +840,7 @@ const App: React.FC = () => {
         <button
             onClick={() => setActiveTool(tool.id)}
             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 aspect-square ${
-                isActive ? 'bg-yellow-500 text-slate-900 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600/50'
+                isActive ? 'bg-yellow-500 text-slate-900 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600/ ৫০'
             }`}
             aria-label={tool.name}
         >

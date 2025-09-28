@@ -32,9 +32,12 @@ export async function applyGenerativeImageEffect(
             },
         });
 
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                return part.inlineData.data;
+        const candidate = response?.candidates?.[0];
+        if (candidate?.content?.parts) {
+            for (const part of candidate.content.parts) {
+                if (part.inlineData) {
+                    return part.inlineData.data;
+                }
             }
         }
         return null;
