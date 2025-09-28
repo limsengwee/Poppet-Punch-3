@@ -1,6 +1,8 @@
 
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, SlapMark, SlapAnimation } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
     MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
@@ -27,48 +29,6 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
   );
 };
 
-const drawFinger = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rot: number) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(rot);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-};
-
-const drawHandPrint = (ctx: CanvasRenderingContext2D, size: number) => {
-    // Palm - a rounded rectangle. Using ellipse for a softer look.
-    const palmWidth = size;
-    const palmHeight = size * 1.1;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, palmWidth / 2, palmHeight / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Fingers - ellipses
-    const fingerWidth = size * 0.25;
-    const fingerLength = size * 0.9;
-    const fingerBaseY = -palmHeight / 2;
-
-    // Little finger
-    drawFinger(ctx, -palmWidth * 0.35, fingerBaseY, fingerWidth * 0.8, fingerLength * 0.7, 0.2);
-    // Ring finger
-    drawFinger(ctx, -palmWidth * 0.1, fingerBaseY, fingerWidth, fingerLength * 0.9, 0.05);
-    // Middle finger
-    drawFinger(ctx, palmWidth * 0.15, fingerBaseY, fingerWidth, fingerLength, -0.05);
-    // Index finger
-    drawFinger(ctx, palmWidth * 0.38, fingerBaseY, fingerWidth * 0.95, fingerLength * 0.85, -0.2);
-
-    // Thumb - rotated ellipse
-    ctx.save();
-    ctx.translate(-palmWidth/2 * 0.8, palmHeight/2 * 0.4);
-    ctx.rotate(-0.9);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, fingerWidth * 1.1, fingerLength * 0.6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-};
-
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
@@ -91,7 +51,7 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
-  const [slapMarks, setSlapMarks] = useState<SlapMark[]>([]);
+  const [swellings, setSwellings] = useState<Swelling[]>([]);
   const [slapAnimations, setSlapAnimations] = useState<SlapAnimation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +73,7 @@ const App: React.FC = () => {
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], slapMarks: SlapMark[]}>({ dents: [], spiders: [], needles: [], bruises: [], slapMarks: [] });
+  const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], swellings: Swelling[]}>({ dents: [], spiders: [], needles: [], bruises: [], swellings: [] });
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -345,30 +305,58 @@ const App: React.FC = () => {
       ctx.restore();
     });
     
-    slapMarks.forEach(slap => {
-      const age = performance.now() - slap.createdAt;
-      const slapAnimationDuration = 300; // ms
+    swellings.forEach(swell => {
+      const age = performance.now() - swell.createdAt;
+      const animDuration = 500; // fade in duration
 
-      const progress = Math.min(age / slapAnimationDuration, 1);
+      const progress = Math.min(age / animDuration, 1);
       const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+      const currentIntensity = swell.intensity * easeOutProgress;
+      if (currentIntensity <= 0) return;
 
-      const maxAlpha = 0.7;
-      const alpha = easeOutProgress * slap.intensity * maxAlpha;
+      const centerX = offsetX + swell.x * finalWidth;
+      const centerY = offsetY + swell.y * finalHeight;
+      const radiusX = swell.radius * swell.aspectRatio * Math.min(finalWidth, finalHeight);
+      const radiusY = swell.radius * Math.min(finalWidth, finalHeight);
       
-      const r = 180 + Math.floor(slap.intensity * 75);
-      const g = 50 - Math.floor(slap.intensity * 20);
-      const b = 50 - Math.floor(slap.intensity * 20);
-      const color = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-
       ctx.save();
-      ctx.fillStyle = color;
-      ctx.globalCompositeOperation = 'multiply';
-
-      ctx.translate(offsetX + slap.x * finalWidth, offsetY + slap.y * finalHeight);
-      ctx.rotate(slap.rotation);
       
-      const size = slap.size * Math.min(finalWidth, finalHeight);
-      drawHandPrint(ctx, size);
+      // Layer 1: Base redness
+      ctx.globalCompositeOperation = 'overlay';
+      const baseRadius = Math.max(radiusX, radiusY) * 1.8;
+      const grad1 = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius);
+      grad1.addColorStop(0.2, `rgba(200, 40, 40, ${0.5 * currentIntensity})`);
+      grad1.addColorStop(1, `rgba(200, 40, 40, 0)`);
+      ctx.fillStyle = grad1;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Layer 2: Swelling Highlight
+      ctx.globalCompositeOperation = 'soft-light';
+      const grad2 = ctx.createRadialGradient(
+          centerX - radiusX * 0.2, centerY - radiusY * 0.2, 0,
+          centerX, centerY, Math.max(radiusX, radiusY) * 1.2
+      );
+      grad2.addColorStop(0, `rgba(255, 200, 200, ${0.6 * currentIntensity})`);
+      grad2.addColorStop(1, `rgba(255, 200, 200, 0)`);
+      ctx.fillStyle = grad2;
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radiusX, radiusY, swell.rotation, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Layer 3: Impact core
+      ctx.globalCompositeOperation = 'color-burn';
+      const grad3 = ctx.createRadialGradient(
+          centerX, centerY, 0,
+          centerX, centerY, Math.max(radiusX, radiusY)
+      );
+      grad3.addColorStop(0, `rgba(150, 0, 0, ${0.4 * currentIntensity})`);
+      grad3.addColorStop(0.8, `rgba(150, 0, 0, 0)`);
+      ctx.fillStyle = grad3;
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, radiusX, radiusY, swell.rotation, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
     });
@@ -413,13 +401,44 @@ const App: React.FC = () => {
         ctx.translate(handX, handY);
         ctx.rotate(anim.rotation);
         
+        const drawHandPrint = (ctx: CanvasRenderingContext2D, size: number) => {
+            const drawFinger = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rot: number) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rot);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            };
+            const palmWidth = size;
+            const palmHeight = size * 1.1;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, palmWidth / 2, palmHeight / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            const fingerWidth = size * 0.25;
+            const fingerLength = size * 0.9;
+            const fingerBaseY = -palmHeight / 2;
+            drawFinger(ctx, -palmWidth * 0.35, fingerBaseY, fingerWidth * 0.8, fingerLength * 0.7, 0.2);
+            drawFinger(ctx, -palmWidth * 0.1, fingerBaseY, fingerWidth, fingerLength * 0.9, 0.05);
+            drawFinger(ctx, palmWidth * 0.15, fingerBaseY, fingerWidth, fingerLength, -0.05);
+            drawFinger(ctx, palmWidth * 0.38, fingerBaseY, fingerWidth * 0.95, fingerLength * 0.85, -0.2);
+            ctx.save();
+            ctx.translate(-palmWidth/2 * 0.8, palmHeight/2 * 0.4);
+            ctx.rotate(-0.9);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, fingerWidth * 1.1, fingerLength * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        };
+
         drawHandPrint(ctx, size);
 
         ctx.restore();
     });
 
 
-  }, [dents, spiders, needles, bruises, slapMarks, slapAnimations]);
+  }, [dents, spiders, needles, bruises, swellings, slapAnimations]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -432,7 +451,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setSlapMarks([]);
+    setSwellings([]);
     setSlapAnimations([]);
     setIsLoading(false);
     setError(null);
@@ -457,7 +476,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setSlapMarks([]);
+    setSwellings([]);
     setSlapAnimations([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
@@ -571,21 +590,21 @@ const App: React.FC = () => {
 
     useEffect(() => {
         let animationFrameId: number;
-        const slapMarkDuration = 300;
+        const swellingDuration = 500;
         const slapAnimationDuration = 400;
 
         const needsAnimation = 
-            slapMarks.some(s => (performance.now() - s.createdAt) < slapMarkDuration) ||
+            swellings.some(s => (performance.now() - s.createdAt) < swellingDuration) ||
             slapAnimations.length > 0;
 
         if (!needsAnimation) return;
 
         const animate = () => {
             const now = performance.now();
-            const stillNeedsMarkAnim = slapMarks.some(s => (now - s.createdAt) < slapMarkDuration);
+            const stillNeedsSwellingAnim = swellings.some(s => (now - s.createdAt) < swellingDuration);
             const stillNeedsSlapAnim = slapAnimations.some(a => (now - a.createdAt) < slapAnimationDuration);
 
-            if (stillNeedsMarkAnim || stillNeedsSlapAnim) {
+            if (stillNeedsSwellingAnim || stillNeedsSlapAnim) {
                 redrawCanvas();
                 animationFrameId = requestAnimationFrame(animate);
             } else {
@@ -598,7 +617,7 @@ const App: React.FC = () => {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [slapMarks, slapAnimations, redrawCanvas]);
+    }, [swellings, slapAnimations, redrawCanvas]);
 
   useEffect(() => {
     if (spiders.length === 0) return;
@@ -656,7 +675,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
-    setSlapMarks([]);
+    setSwellings([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -707,7 +726,7 @@ const App: React.FC = () => {
       setSpiders([]);
       setNeedles([]);
       setBruises([]);
-      setSlapMarks([]);
+      setSwellings([]);
       setSlapAnimations([]);
       setHitCount(0);
       setHasDestructiveChanges(false);
@@ -804,12 +823,12 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        nonDestructiveEffectsBackup.current = { dents, spiders, needles, bruises, slapMarks };
+        nonDestructiveEffectsBackup.current = { dents, spiders, needles, bruises, swellings };
         setDents([]);
         setSpiders([]);
         setNeedles([]);
         setBruises([]);
-        setSlapMarks([]);
+        setSwellings([]);
         setSlapAnimations([]);
 
         try {
@@ -845,7 +864,7 @@ const App: React.FC = () => {
                 setSpiders(nonDestructiveEffectsBackup.current.spiders);
                 setNeedles(nonDestructiveEffectsBackup.current.needles);
                 setBruises(nonDestructiveEffectsBackup.current.bruises);
-                setSlapMarks(nonDestructiveEffectsBackup.current.slapMarks);
+                setSwellings(nonDestructiveEffectsBackup.current.swellings);
             }
         } catch (e) {
             console.error(e);
@@ -855,7 +874,7 @@ const App: React.FC = () => {
             setSpiders(nonDestructiveEffectsBackup.current.spiders);
             setNeedles(nonDestructiveEffectsBackup.current.needles);
             setBruises(nonDestructiveEffectsBackup.current.bruises);
-            setSlapMarks(nonDestructiveEffectsBackup.current.slapMarks);
+            setSwellings(nonDestructiveEffectsBackup.current.swellings);
         } finally {
             setIsLoading(false);
         }
@@ -874,35 +893,63 @@ const App: React.FC = () => {
       if (!audioContext || audioContext.state === 'suspended') {
           audioContext?.resume();
       }
+      if (!audioContext) return;
+
+      const now = audioContext.currentTime;
+      const s = strength / 100;
+
+      // Layer 1: The low-frequency "thump" of the impact
+      const thump = audioContext.createOscillator();
+      thump.type = 'sine';
       
-      const bufferSize = audioContext.sampleRate * 0.1; 
+      const thumpGain = audioContext.createGain();
+      const thumpStartFreq = 180 - s * 80; // Stronger slap = lower frequency (180Hz down to 100Hz)
+      const thumpEndFreq = 50;
+      const thumpVolume = 0.4 + s * 0.4; // 0.4 to 0.8 volume
+
+      thump.frequency.setValueAtTime(thumpStartFreq, now);
+      thump.frequency.exponentialRampToValueAtTime(thumpEndFreq, now + 0.15);
+      
+      thumpGain.gain.setValueAtTime(thumpVolume, now);
+      thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      thump.connect(thumpGain);
+      thumpGain.connect(audioContext.destination);
+
+      // Layer 2: The high-frequency "crack" of the slap
+      const bufferSize = audioContext.sampleRate * 0.1; // 0.1s of noise is enough
       const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
       const output = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1;
+          output[i] = Math.random() * 2 - 1; // White noise
       }
 
-      const source = audioContext.createBufferSource();
-      source.buffer = buffer;
+      const crack = audioContext.createBufferSource();
+      crack.buffer = buffer;
 
-      const gainNode = audioContext.createGain();
-      const volume = 0.2 + (strength / 100) * 0.8;
-      const now = audioContext.currentTime;
+      const crackGain = audioContext.createGain();
+      const crackVolume = 0.5 + s * 0.5; // 0.5 to 1.0 volume
+      
+      // A very sharp attack and quick decay for the "crack"
+      crackGain.gain.setValueAtTime(0, now);
+      crackGain.gain.linearRampToValueAtTime(crackVolume, now + 0.002);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 + s * 0.02);
 
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(volume, now + 0.005);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1 + (strength/100 * 0.1));
+      const bandpass = audioContext.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      // Stronger slap = higher frequency, sharper sound
+      const crackFreq = 2000 + s * 5000; // 2000Hz up to 7000Hz
+      bandpass.frequency.value = crackFreq;
+      bandpass.Q.value = 0.8;
 
-      const lowpass = audioContext.createBiquadFilter();
-      lowpass.type = "lowpass";
-      const maxFreq = 8000;
-      const minFreq = 2000;
-      lowpass.frequency.value = maxFreq - (strength/100) * (maxFreq - minFreq);
+      crack.connect(bandpass);
+      bandpass.connect(crackGain);
+      crackGain.connect(audioContext.destination);
 
-      source.connect(lowpass);
-      lowpass.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      source.start(now);
+      thump.start(now);
+      crack.start(now);
+      
+      thump.stop(now + 0.2); // Clean up the oscillator
   }, []);
 
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
@@ -928,17 +975,25 @@ const App: React.FC = () => {
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'hand') {
-        const baseSize = 0.08 + (strength / 100) * 0.08;
-        const rotation = (Math.random() - 0.5) * 0.5;
+        const baseRadius = 0.06 + (strength / 100) * 0.09;
         
-        setSlapMarks(prev => [...prev, {
-            x: pos.x, y: pos.y, size: baseSize, rotation,
-            intensity: strength / 100, createdAt: performance.now(),
-        }]);
+        const newSwelling: Swelling = {
+            x: pos.x,
+            y: pos.y,
+            radius: baseRadius,
+            intensity: strength / 100,
+            aspectRatio: 1 + (Math.random() - 0.5) * 0.7,
+            rotation: Math.random() * Math.PI * 2,
+            createdAt: performance.now(),
+        };
+        setSwellings(prev => [...prev, newSwelling]);
+
+        const slapSize = 0.08 + (strength / 100) * 0.08;
+        const rotation = (Math.random() - 0.5) * 0.5;
 
         setSlapAnimations(prev => [...prev, {
             id: performance.now(), x: pos.x, y: pos.y, 
-            size: baseSize * 1.2, rotation, createdAt: performance.now()
+            size: slapSize * 1.2, rotation, createdAt: performance.now()
         }]);
         
         playSlapSound(strength);
@@ -1237,7 +1292,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && slapMarks.length === 0 && !hasDestructiveChanges}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && swellings.length === 0 && !hasDestructiveChanges}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />
