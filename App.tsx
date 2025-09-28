@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation, SlipperAnimation } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation, ClogAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, BlisterIcon, SkullIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon, SlipperIcon
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, BlisterIcon, SkullIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon, ClogIcon
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -35,10 +35,12 @@ const tools = [
     { id: 'shatter', name: '碎裂', icon: CrackIcon },
     { id: 'ugly', name: '丑化', icon: UglyIcon },
     { id: 'skull', name: '骷髅', icon: SkullIcon },
-    { id: 'slipperPunch', name: '拖鞋攻击', icon: SlipperIcon },
+    { id: 'clogStrike', name: '木屐攻击', icon: ClogIcon },
 ];
 
 type ToolId = typeof tools[number]['id'];
+
+const CLOG_IMAGE_DATA_URL = 'data:image/png;base64,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';
 
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -50,7 +52,7 @@ const App: React.FC = () => {
   const [bruises, setBruises] = useState<Bruise[]>([]);
   const [swellings, setSwellings] = useState<Swelling[]>([]);
   const [slapAnimations, setSlapAnimations] = useState<SlapAnimation[]>([]);
-  const [slipperAnimations, setSlipperAnimations] = useState<SlipperAnimation[]>([]);
+  const [clogAnimations, setClogAnimations] = useState<ClogAnimation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -62,18 +64,26 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ToolId>('mallet');
   const [strength, setStrength] = useState<number>(50);
   const [hasDestructiveChanges, setHasDestructiveChanges] = useState<boolean>(false);
-  const [customSlapSound, setCustomSlapSound] = useState<{url: string, name: string} | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const soundInputRef = useRef<HTMLInputElement>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   const audioContextRef = useRef<AudioContext | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const loopingAudioRef = useRef<HTMLAudioElement>(null);
+  const clogImageRef = useRef<HTMLImageElement | null>(null);
   
   const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], swellings: Swelling[]}>({ dents: [], spiders: [], needles: [], bruises: [], swellings: [] });
+
+  useEffect(() => {
+    // Pre-load the clog image
+    const img = new Image();
+    img.src = CLOG_IMAGE_DATA_URL;
+    img.onload = () => {
+      clogImageRef.current = img;
+    };
+  }, []);
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -419,22 +429,22 @@ const App: React.FC = () => {
         ctx.restore();
     });
 
-    slipperAnimations.forEach(anim => {
+    clogAnimations.forEach(anim => {
       const age = now - anim.createdAt;
       const slapDuration = 150 - (strength/100) * 100; // Faster with more strength
       const totalDuration = anim.totalSlaps * slapDuration;
 
       if (age > totalDuration) return;
+      if (!clogImageRef.current) return;
 
       ctx.save();
-      const size = anim.size * Math.min(finalWidth, finalHeight);
+      const baseSize = anim.size * Math.min(finalWidth, finalHeight);
       
-      const currentSlap = Math.floor(age / slapDuration);
       const progressInSlap = (age % slapDuration) / slapDuration;
 
       let rotationOffset = 0;
       let distOffset = 0;
-      const windUpDist = size * 1.5;
+      const windUpDist = baseSize * 1.5;
 
       if (progressInSlap < 0.4) { // Wind up
         const t = progressInSlap / 0.4;
@@ -446,7 +456,7 @@ const App: React.FC = () => {
         rotationOffset = -0.5 * (1-t);
       } else { // Retract
         const t = (progressInSlap - 0.5) / 0.5;
-        distOffset = size * 0.2 * t;
+        distOffset = baseSize * 0.2 * t;
         rotationOffset = 0.2 * t;
       }
       
@@ -457,37 +467,21 @@ const App: React.FC = () => {
       ctx.translate(slipperX, slipperY);
       ctx.rotate(anim.rotation + rotationOffset);
       
-      const drawSlipper = (ctx: CanvasRenderingContext2D, size: number) => {
-        const w = size;
-        const h = size * 2.2;
-        ctx.fillStyle = '#c2410c'; // Slipper color
-        ctx.beginPath();
-        ctx.moveTo(-w/2, -h/2);
-        ctx.bezierCurveTo(-w*0.8, -h*0.1, -w*0.8, h*0.3, -w/2, h/2);
-        ctx.lineTo(w/2, h/2);
-        ctx.bezierCurveTo(w*0.8, h*0.3, w*0.8, -h*0.1, w/2, -h/2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#451a03'; // Strap
-        ctx.beginPath();
-        ctx.rect(-w*0.4, -h * 0.25, w * 0.8, h * 0.2);
-        ctx.fill();
-      };
-
-      drawSlipper(ctx, size);
+      const clogImg = clogImageRef.current;
+      const aspectRatio = clogImg.naturalWidth / clogImg.naturalHeight;
+      const h = baseSize * 2.2;
+      const w = h * aspectRatio;
+      ctx.drawImage(clogImg, -w/2, -h/2, w, h);
 
       ctx.restore();
     });
 
 
-  }, [dents, spiders, needles, bruises, swellings, slapAnimations, slipperAnimations, strength]);
+  }, [dents, spiders, needles, bruises, swellings, slapAnimations, clogAnimations, strength]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
       URL.revokeObjectURL(imageSrc);
-    }
-    if (customSlapSound) {
-      URL.revokeObjectURL(customSlapSound.url);
     }
     setImageFile(null);
     setImageSrc(null);
@@ -498,8 +492,7 @@ const App: React.FC = () => {
     setBruises([]);
     setSwellings([]);
     setSlapAnimations([]);
-    setSlipperAnimations([]);
-    setCustomSlapSound(null);
+    setClogAnimations([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -510,16 +503,13 @@ const App: React.FC = () => {
     if(fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    if(soundInputRef.current) {
-      soundInputRef.current.value = "";
-    }
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
       ctx?.clearRect(0, 0, canvas.width, canvas.height);
     }
     offscreenCanvasRef.current = null;
-  }, [imageSrc, customSlapSound]);
+  }, [imageSrc]);
   
   const resetEffects = useCallback(() => {
     setDents([]);
@@ -528,7 +518,7 @@ const App: React.FC = () => {
     setBruises([]);
     setSwellings([]);
     setSlapAnimations([]);
-    setSlipperAnimations([]);
+    setClogAnimations([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
 
@@ -643,12 +633,12 @@ const App: React.FC = () => {
       let animationFrameId: number;
       const swellingDuration = 500;
       const slapAnimationDuration = 400;
-      const slipperSlapDuration = 150 - (strength/100) * 100;
+      const clogSlapDuration = 150 - (strength/100) * 100;
       
       const needsAnimation = 
           swellings.some(s => (performance.now() - s.createdAt) < swellingDuration) ||
           slapAnimations.length > 0 ||
-          slipperAnimations.length > 0;
+          clogAnimations.length > 0;
 
       if (!needsAnimation) return;
 
@@ -656,14 +646,14 @@ const App: React.FC = () => {
           const now = performance.now();
           const stillNeedsSwellingAnim = swellings.some(s => (now - s.createdAt) < swellingDuration);
           const stillNeedsSlapAnim = slapAnimations.some(a => (now - a.createdAt) < slapAnimationDuration);
-          const stillNeedsSlipperAnim = slipperAnimations.some(a => (now - a.createdAt) < a.totalSlaps * slipperSlapDuration);
+          const stillNeedsClogAnim = clogAnimations.some(a => (now - a.createdAt) < a.totalSlaps * clogSlapDuration);
 
-          if (stillNeedsSwellingAnim || stillNeedsSlapAnim || stillNeedsSlipperAnim) {
+          if (stillNeedsSwellingAnim || stillNeedsSlapAnim || stillNeedsClogAnim) {
               redrawCanvas();
               animationFrameId = requestAnimationFrame(animate);
           } else {
               setSlapAnimations([]);
-              setSlipperAnimations([]);
+              setClogAnimations([]);
           }
       };
 
@@ -672,7 +662,7 @@ const App: React.FC = () => {
       return () => {
           cancelAnimationFrame(animationFrameId);
       };
-  }, [swellings, slapAnimations, slipperAnimations, redrawCanvas, strength]);
+  }, [swellings, slapAnimations, clogAnimations, redrawCanvas, strength]);
 
   useEffect(() => {
     if (spiders.length === 0) return;
@@ -721,6 +711,17 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [spiders.length, faceBox]);
 
+  useEffect(() => {
+    const audio = loopingAudioRef.current;
+    if (!audio) return;
+
+    if (activeTool === 'clogStrike') {
+        audio.play().catch(e => console.error("Audio play failed:", e));
+    } else {
+        audio.pause();
+        audio.currentTime = 0;
+    }
+  }, [activeTool]);
 
   const runFaceDetection = useCallback(async (file: File) => {
     setIsLoading(true);
@@ -774,26 +775,6 @@ const App: React.FC = () => {
       setImageFile(file);
       setImageSrc(URL.createObjectURL(file));
     }
-  };
-  
-  const handleSoundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-        if (customSlapSound) {
-            URL.revokeObjectURL(customSlapSound.url);
-        }
-        setCustomSlapSound({url: URL.createObjectURL(file), name: file.name});
-    }
-  };
-
-  const clearCustomSound = () => {
-      if (customSlapSound) {
-          URL.revokeObjectURL(customSlapSound.url);
-          setCustomSlapSound(null);
-          if (soundInputRef.current) {
-              soundInputRef.current.value = "";
-          }
-      }
   };
 
   const getPosOnImage = (event: React.MouseEvent<HTMLElement>) => {
@@ -936,19 +917,6 @@ const App: React.FC = () => {
       thump.stop(now + 0.2);
   }, []);
 
-  const playSlipperSound = useCallback(() => {
-    if (customSlapSound) {
-        if (!audioRef.current) {
-            audioRef.current = new Audio();
-        }
-        audioRef.current.src = customSlapSound.url;
-        audioRef.current.volume = Math.min(1, strength / 100);
-        audioRef.current.play().catch(e => console.error("Error playing custom sound:", e));
-    } else {
-        playSlapSound(strength);
-    }
-  }, [customSlapSound, strength, playSlapSound]);
-
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
@@ -1056,26 +1024,20 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
-    } else if (activeTool === 'slipperPunch') {
+    } else if (activeTool === 'clogStrike') {
         const slapCount = 1 + Math.floor((strength / 100) * 5);
-        const slapDuration = 150 - (strength/100) * 100;
 
-        const newAnimation: SlipperAnimation = {
+        const newAnimation: ClogAnimation = {
             id: performance.now(),
             x: pos.x,
             y: pos.y,
-            size: 0.06 + (strength / 100) * 0.05,
+            size: 0.08 + (strength / 100) * 0.06,
             rotation: (Math.random() - 0.5) * 0.6,
             createdAt: performance.now(),
             totalSlaps: slapCount,
         };
-        setSlipperAnimations(prev => [...prev, newAnimation]);
+        setClogAnimations(prev => [...prev, newAnimation]);
         
-        // Play sound for each slap
-        for (let i = 0; i < slapCount; i++) {
-            setTimeout(() => playSlipperSound(), i * slapDuration + (slapDuration * 0.45));
-        }
-
         setHitCount(prev => prev + slapCount);
         setCoins(prev => prev + 5 * slapCount);
     } else if (activeTool === 'shatter') {
@@ -1181,14 +1143,13 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
-  const triggerSoundInput = () => soundInputRef.current?.click();
   
   const getCursor = () => {
       if (!imageSrc) return 'default';
       if (isLoading) return 'wait';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
       if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly', 'skull'].includes(activeTool)) return 'crosshair';
-      if (activeTool === 'slipperPunch') return 'pointer';
+      if (activeTool === 'clogStrike') return 'pointer';
       if (activeTool === 'hand') return 'grab';
       return 'default';
   }
@@ -1211,6 +1172,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/40 via-slate-900 to-black text-slate-100 flex flex-col items-center p-4 sm:p-6 lg:p-8 font-sans">
+      <audio ref={loopingAudioRef} src="/extracted_audio.mp3" loop />
       <div className="w-full max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-6 text-yellow-300">
             <h1 className="text-2xl sm:text-3xl font-bold">打小人! Poppet Punch!</h1>
@@ -1301,21 +1263,6 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                         onChange={(e) => setStrength(Number(e.target.value))}
                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                     />
-                </div>
-
-                <div id="custom-sound" className="bg-slate-800/40 p-3 rounded-lg">
-                    <h4 className="font-bold text-slate-300 text-sm mb-2">自定义音效 (拖鞋)</h4>
-                    <input type="file" accept="audio/mpeg" onChange={handleSoundUpload} ref={soundInputRef} className="hidden" />
-                    {customSlapSound ? (
-                        <div className="bg-slate-700/50 text-xs text-slate-300 rounded-md px-2 py-1 flex items-center justify-between">
-                            <span className="truncate w-40">{customSlapSound.name}</span>
-                            <button onClick={clearCustomSound} className="text-red-400 hover:text-red-300 font-bold text-lg">&times;</button>
-                        </div>
-                    ) : (
-                        <button onClick={triggerSoundInput} className="w-full text-sm text-center py-2 bg-slate-600 rounded-md hover:bg-slate-500 transition-colors">
-                            上传 MP3
-                        </button>
-                    )}
                 </div>
 
                 <button 

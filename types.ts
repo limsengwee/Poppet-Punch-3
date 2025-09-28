@@ -64,7 +64,7 @@ export interface SlapAnimation {
   createdAt: number;
 }
 
-export interface SlipperAnimation {
+export interface ClogAnimation {
   id: number;
   x: number;
   y: number;
