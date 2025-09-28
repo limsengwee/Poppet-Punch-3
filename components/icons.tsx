@@ -89,9 +89,9 @@ export const CrackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 );
 
 
-export const LightningIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const SkullIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M11 15H6L13 1V9H18L11 23V15Z" />
+    <path d="M12 2C6.48 2 2 6.48 2 12v3.5c0 1.66 1.34 3 3 3h1.5v-1.5c0-1.38 1.12-2.5 2.5-2.5h4c1.38 0 2.5 1.12 2.5 2.5V20H19c1.66 0 3-1.34 3-3V12c0-5.52-4.48-10-10-10zm-4 9.5c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm8 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM12 20c-1.38 0-2.5-1.12-2.5-2.5V16h5v1.5c0 1.38-1.12 2.5-2.5 2.5z" />
   </svg>
 );
 

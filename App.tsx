@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, LightningIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -34,7 +34,7 @@ const tools = [
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'shatter', name: '碎裂', icon: CrackIcon },
     { id: 'ugly', name: '丑化', icon: UglyIcon },
-    { id: 'lightning', name: '闪电', icon: LightningIcon },
+    { id: 'skull', name: '骷髅', icon: SkullIcon },
     { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
 ];
 
@@ -66,6 +66,8 @@ const App: React.FC = () => {
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
+  
+  const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[]}>({ dents: [], spiders: [], needles: [], bruises: [] });
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -516,9 +518,25 @@ const App: React.FC = () => {
     reader.onerror = () => { setError("Failed to read file."); setIsLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (imageFile) runFaceDetection(imageFile);
+  const handleImageLoaded = useCallback(() => {
+    if (imageFile) {
+        runFaceDetection(imageFile);
+    }
   }, [imageFile, runFaceDetection]);
+
+  useEffect(() => {
+      const img = imageRef.current;
+      if (img && imageSrc) {
+          img.addEventListener('load', handleImageLoaded);
+          // If the image is already loaded (e.g., from cache), trigger detection manually.
+          if (img.complete && img.naturalWidth > 0) {
+              handleImageLoaded();
+          }
+          return () => {
+              img.removeEventListener('load', handleImageLoaded);
+          };
+      }
+  }, [imageSrc, handleImageLoaded]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -526,6 +544,16 @@ const App: React.FC = () => {
       if (imageSrc) URL.revokeObjectURL(imageSrc);
       setImageFile(file);
       setImageSrc(URL.createObjectURL(file));
+      
+      // Reset everything for the new image
+      setFaceBox(null);
+      setDents([]);
+      setSpiders([]);
+      setNeedles([]);
+      setBruises([]);
+      setHitCount(0);
+      setHasDestructiveChanges(false);
+      offscreenCanvasRef.current = null;
     }
   };
 
@@ -617,6 +645,8 @@ const App: React.FC = () => {
 
         setIsLoading(true);
         setError(null);
+        
+        nonDestructiveEffectsBackup.current = { dents, spiders, needles, bruises };
         setDents([]);
         setSpiders([]);
         setNeedles([]);
@@ -650,10 +680,20 @@ const App: React.FC = () => {
                 setCoins(prev => prev + 10);
             } else {
                 setError("AI failed to generate the effect. Please try again.");
+                // Restore non-destructive effects on failure
+                setDents(nonDestructiveEffectsBackup.current.dents);
+                setSpiders(nonDestructiveEffectsBackup.current.spiders);
+                setNeedles(nonDestructiveEffectsBackup.current.needles);
+                setBruises(nonDestructiveEffectsBackup.current.bruises);
             }
         } catch (e) {
             console.error(e);
             setError("An error occurred while applying the AI effect.");
+            // Restore non-destructive effects on error
+            setDents(nonDestructiveEffectsBackup.current.dents);
+            setSpiders(nonDestructiveEffectsBackup.current.spiders);
+            setNeedles(nonDestructiveEffectsBackup.current.needles);
+            setBruises(nonDestructiveEffectsBackup.current.bruises);
         } finally {
             setIsLoading(false);
         }
@@ -775,6 +815,17 @@ Based on the strength value of ${strength}, ${description}
 Preserve the background, but apply these evil and ugly transformations to the person's face and features.`;
         };
         handleAIEffect(promptGenerator);
+    } else if (activeTool === 'skull') {
+        const promptGenerator = (strength: number) => {
+            return `Transform the person's face into a photorealistic human skull. The degree of this transformation must be precisely ${strength}%. The effect should look like the skin is being removed or is transparent, revealing the skull structure underneath.
+
+- At 1%, only a tiny patch of skin (like on a cheek) should become transparent, revealing the bone.
+- At 50%, roughly half of the face's skin should be gone, showing the skull, with peeling or torn skin at the edges of the effect.
+- At 100%, the entire face (skin, nose, eyes, lips) must be replaced by a complete, photorealistic human skull.
+
+Crucially, you MUST preserve the original background, hair, ears, neck, and any clothing perfectly. The transformation should ONLY apply to the facial area.`
+        };
+        handleAIEffect(promptGenerator);
     }
   };
   
@@ -842,7 +893,7 @@ Preserve the background, but apply these evil and ugly transformations to the pe
   const getCursor = () => {
       if (!imageSrc) return 'default';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
-      if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly'].includes(activeTool)) return 'crosshair';
+      if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly', 'skull'].includes(activeTool)) return 'crosshair';
       if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
       return 'default';
   }
@@ -916,6 +967,7 @@ Preserve the background, but apply these evil and ugly transformations to the pe
                                 <p className="mt-4 text-lg font-semibold animate-pulse">
                                   {activeTool === 'shatter' ? 'AI 正在生成裂纹...' :
                                    activeTool === 'ugly' ? 'AI 正在丑化...' :
+                                   activeTool === 'skull' ? 'AI 正在生成骷髅...' :
                                    'Detecting face...'}
                                 </p>
                             </div>
