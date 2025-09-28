@@ -27,7 +27,7 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
 };
 
 const tools = [
-    { id: 'hand', name: '手拍', icon: HandIcon },
+    { id: 'hand', name: '手掌', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
     { id: 'fistPunch', name: '水泡', icon: BlisterIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
@@ -1224,7 +1224,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                         </div>
                          <div className="mt-8 bg-green-900/50 border border-green-700 text-green-300 px-4 py-3 rounded-lg flex items-center gap-3 justify-center">
                             <span className="text-2xl">✔</span>
-                            <p>基础锤子已启用 - 无需AI检测，直接开始游戏!</p>
+                            <p>基础锤子已可用 - 无需AI检测，直接开始游戏!</p>
                         </div>
                     </div>
                 ) : (
