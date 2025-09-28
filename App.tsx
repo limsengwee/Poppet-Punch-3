@@ -69,6 +69,8 @@ export const App: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const animationFrameRef = useRef<number>();
+    const [clogAudioBuffer, setClogAudioBuffer] = useState<AudioBuffer | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
 
     const clearAllEffects = useCallback(() => {
         setDents([]);
@@ -183,6 +185,31 @@ export const App: React.FC = () => {
         }
     }, [image, imageMimeType, backupNonDestructiveEffects, restoreNonDestructiveEffects]);
 
+    useEffect(() => {
+        const initAudio = async () => {
+            if (!audioContextRef.current) {
+                try {
+                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+                } catch (e) {
+                    console.error("Web Audio API is not supported in this browser");
+                    return;
+                }
+            }
+            const audioContext = audioContextRef.current;
+            
+            try {
+                const response = await fetch(CLOG_STRIKE_AUDIO_DATA_URL);
+                const arrayBuffer = await response.arrayBuffer();
+                audioContext.decodeAudioData(arrayBuffer, 
+                    (buffer) => { setClogAudioBuffer(buffer); }, 
+                    (error) => { console.error('Error decoding audio data:', error); }
+                );
+            } catch (error) {
+                console.error('Failed to fetch or decode audio data:', error);
+            }
+        };
+        initAudio();
+    }, []);
 
     const drawClog = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, rotation: number) => {
         const clogImg = new Image();
@@ -196,11 +223,15 @@ export const App: React.FC = () => {
         ctx.restore();
     };
     
-    const playClogSound = (strength: number) => {
+    const playClogSound = useCallback((strength: number) => {
+        if (!clogAudioBuffer || !audioContextRef.current) {
+            return;
+        }
+
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const audio = new Audio(CLOG_STRIKE_AUDIO_DATA_URL);
-            const source = audioContext.createMediaElementSource(audio);
+            const audioContext = audioContextRef.current;
+            const source = audioContext.createBufferSource();
+            source.buffer = clogAudioBuffer;
             
             const gainNode = audioContext.createGain();
             const volume = 0.2 + (strength / 100) * 0.8;
@@ -209,11 +240,11 @@ export const App: React.FC = () => {
             source.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            audio.play();
+            source.start(0);
         } catch (e) {
             console.error("Audio play failed:", e);
         }
-    };
+    }, [clogAudioBuffer]);
 
     const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
@@ -648,7 +679,7 @@ export const App: React.FC = () => {
         setDents(prevDents => prevDents.filter(d => (now - d.createdAt) < DENT_FADE_DURATION));
         
         animationFrameRef.current = requestAnimationFrame(draw);
-    }, [image, faceBox, dents, spiders, needles, bruises, swellings, slapAnimations, clogAnimations, strength]);
+    }, [image, faceBox, dents, spiders, needles, bruises, swellings, slapAnimations, clogAnimations, strength, playClogSound]);
 
     useEffect(() => {
         animationFrameRef.current = requestAnimationFrame(draw);
