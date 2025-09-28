@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, SlapMark } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, SlapMark, SlapAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
     MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
@@ -92,6 +92,7 @@ const App: React.FC = () => {
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
   const [slapMarks, setSlapMarks] = useState<SlapMark[]>([]);
+  const [slapAnimations, setSlapAnimations] = useState<SlapAnimation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -110,6 +111,7 @@ const App: React.FC = () => {
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], slapMarks: SlapMark[]}>({ dents: [], spiders: [], needles: [], bruises: [], slapMarks: [] });
 
@@ -371,7 +373,53 @@ const App: React.FC = () => {
       ctx.restore();
     });
 
-  }, [dents, spiders, needles, bruises, slapMarks]);
+    ctx.globalCompositeOperation = 'source-over';
+
+    slapAnimations.forEach(anim => {
+        const age = now - anim.createdAt;
+        const duration = 400; //ms
+
+        if (age > duration) return;
+
+        const progress = age / duration;
+
+        ctx.save();
+        
+        const size = anim.size * Math.min(finalWidth, finalHeight);
+        
+        const startDist = size * 2.5;
+        let currentDist = 0;
+        let alpha = 1.0;
+        
+        if (progress < 0.25) { // Fast approach
+            const t = progress / 0.25;
+            const easeOutT = 1 - Math.pow(1 - t, 3);
+            currentDist = startDist * (1 - easeOutT);
+            alpha = t;
+        } else { // Hold and retract
+            const t = (progress - 0.25) / 0.75;
+            const easeInT = t * t;
+            currentDist = easeInT * (startDist * 0.5);
+            alpha = 1 - t;
+        }
+
+        const angle = anim.rotation - Math.PI / 2; // Hand comes from the side
+        const handX = offsetX + anim.x * finalWidth + Math.cos(angle) * currentDist;
+        const handY = offsetY + anim.y * finalHeight + Math.sin(angle) * currentDist;
+        
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = `rgba(255, 220, 200, ${alpha * 0.9})`;
+
+        ctx.translate(handX, handY);
+        ctx.rotate(anim.rotation);
+        
+        drawHandPrint(ctx, size);
+
+        ctx.restore();
+    });
+
+
+  }, [dents, spiders, needles, bruises, slapMarks, slapAnimations]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -385,6 +433,7 @@ const App: React.FC = () => {
     setNeedles([]);
     setBruises([]);
     setSlapMarks([]);
+    setSlapAnimations([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -409,6 +458,7 @@ const App: React.FC = () => {
     setNeedles([]);
     setBruises([]);
     setSlapMarks([]);
+    setSlapAnimations([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
 
@@ -519,21 +569,36 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [dents, redrawCanvas]);
 
-  useEffect(() => {
-    let animationFrameId: number;
-    const animationDuration = 300;
-    const needsAnimation = slapMarks.some(s => (performance.now() - s.createdAt) < animationDuration);
-    if (!needsAnimation) return;
-    
-    const animate = () => {
-        redrawCanvas();
-        if (slapMarks.some(s => (performance.now() - s.createdAt) < animationDuration)) {
-            animationFrameId = requestAnimationFrame(animate);
-        }
-    };
-    animationFrameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [slapMarks, redrawCanvas]);
+    useEffect(() => {
+        let animationFrameId: number;
+        const slapMarkDuration = 300;
+        const slapAnimationDuration = 400;
+
+        const needsAnimation = 
+            slapMarks.some(s => (performance.now() - s.createdAt) < slapMarkDuration) ||
+            slapAnimations.length > 0;
+
+        if (!needsAnimation) return;
+
+        const animate = () => {
+            const now = performance.now();
+            const stillNeedsMarkAnim = slapMarks.some(s => (now - s.createdAt) < slapMarkDuration);
+            const stillNeedsSlapAnim = slapAnimations.some(a => (now - a.createdAt) < slapAnimationDuration);
+
+            if (stillNeedsMarkAnim || stillNeedsSlapAnim) {
+                redrawCanvas();
+                animationFrameId = requestAnimationFrame(animate);
+            } else {
+                setSlapAnimations([]); // Clean up finished animations
+            }
+        };
+
+        animationFrameId = requestAnimationFrame(animate);
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [slapMarks, slapAnimations, redrawCanvas]);
 
   useEffect(() => {
     if (spiders.length === 0) return;
@@ -643,6 +708,7 @@ const App: React.FC = () => {
       setNeedles([]);
       setBruises([]);
       setSlapMarks([]);
+      setSlapAnimations([]);
       setHitCount(0);
       setHasDestructiveChanges(false);
       offscreenCanvasRef.current = null;
@@ -744,6 +810,7 @@ const App: React.FC = () => {
         setNeedles([]);
         setBruises([]);
         setSlapMarks([]);
+        setSlapAnimations([]);
 
         try {
             const base64ImageData = offscreenCanvasRef.current.toDataURL(imageFile.type).split(',')[1];
@@ -793,6 +860,50 @@ const App: React.FC = () => {
             setIsLoading(false);
         }
     };
+    
+  const playSlapSound = useCallback((strength: number) => {
+      if (!audioContextRef.current) {
+          try {
+              audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          } catch (e) {
+              console.error("Web Audio API is not supported.", e);
+              return;
+          }
+      }
+      const audioContext = audioContextRef.current;
+      if (!audioContext || audioContext.state === 'suspended') {
+          audioContext?.resume();
+      }
+      
+      const bufferSize = audioContext.sampleRate * 0.1; 
+      const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+
+      const gainNode = audioContext.createGain();
+      const volume = 0.2 + (strength / 100) * 0.8;
+      const now = audioContext.currentTime;
+
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(volume, now + 0.005);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1 + (strength/100 * 0.1));
+
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = "lowpass";
+      const maxFreq = 8000;
+      const minFreq = 2000;
+      lowpass.frequency.value = maxFreq - (strength/100) * (maxFreq - minFreq);
+
+      source.connect(lowpass);
+      lowpass.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      source.start(now);
+  }, []);
 
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
@@ -818,16 +929,20 @@ const App: React.FC = () => {
         setCoins(prev => prev + 5);
     } else if (activeTool === 'hand') {
         const baseSize = 0.08 + (strength / 100) * 0.08;
+        const rotation = (Math.random() - 0.5) * 0.5;
         
-        const newSlapMark: SlapMark = {
-            x: pos.x,
-            y: pos.y,
-            size: baseSize,
-            rotation: (Math.random() - 0.5) * 0.5,
-            intensity: strength / 100,
-            createdAt: performance.now(),
-        };
-        setSlapMarks(prev => [...prev, newSlapMark]);
+        setSlapMarks(prev => [...prev, {
+            x: pos.x, y: pos.y, size: baseSize, rotation,
+            intensity: strength / 100, createdAt: performance.now(),
+        }]);
+
+        setSlapAnimations(prev => [...prev, {
+            id: performance.now(), x: pos.x, y: pos.y, 
+            size: baseSize * 1.2, rotation, createdAt: performance.now()
+        }]);
+        
+        playSlapSound(strength);
+        
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooSpider') {

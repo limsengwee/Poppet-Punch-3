@@ -53,3 +53,12 @@ export interface SlapMark {
   intensity: number;
   createdAt: number;
 }
+
+export interface SlapAnimation {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  createdAt: number;
+}
