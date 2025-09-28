@@ -1,5 +1,5 @@
 {
   "name": "Face Mallet",
-  "description": "An interactive web application that allows users to upload a picture, detects a face using AI, and provides a toolbox of effects to playfully interact with the face, including a classic clog strike.",
+  "description": "An interactive web application that allows users to upload a picture, detects a face using AI, and provides a mallet tool to playfully hammer the detected face, creating dent effects on click.",
   "requestFramePermissions": []
 }

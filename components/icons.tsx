@@ -101,12 +101,13 @@ export const SkullIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const ClogIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M19.1,4.4c-2.4-1-5.2-0.5-7,1.3l-4,4c-2.4,2.4-2,6.1,0.8,7.9l-3.1,3.1c-0.5,0.5-0.5,1.3,0,1.8l0.9,0.9
-        c0.5,0.5,1.3,0.5,1.8,0l3.1-3.1c1.8,2.7,5.5,3.2,7.9,0.8l4-4C24.4,12.2,22.4,6.2,19.1,4.4z M10.4,18.1c-1.4,0-2.6-1.2-2.6-2.6
-        s1.2-2.6,2.6-2.6s2.6,1.2,2.6,2.6S11.8,18.1,10.4,18.1z"/>
-    </svg>
+export const TornadoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M22,6H2a1,1,0,0,0,0,2H22a1,1,0,0,0,0-2Z"/>
+    <path d="M19,10H5a1,1,0,0,0,0,2H19a1,1,0,0,0,0-2Z"/>
+    <path d="M16,14H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/>
+    <path d="M13,18H11a1,1,0,0,0,0,2h2a1,1,0,0,0,0-2Z"/>
+  </svg>
 );
 
 export const RestartIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (

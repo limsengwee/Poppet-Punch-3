@@ -63,13 +63,3 @@ export interface SlapAnimation {
   rotation: number;
   createdAt: number;
 }
-
-export interface ClogAnimation {
-  id: number;
-  x: number;
-  y: number;
-  size: number;
-  rotation: number;
-  createdAt: number;
-  totalSlaps: number;
-}
