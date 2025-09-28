@@ -40,7 +40,7 @@ const tools = [
 
 type ToolId = typeof tools[number]['id'];
 
-const CLOG_IMAGE_DATA_URL = 'data:image/png;base64,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';
+const CLOG_IMAGE_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADGCAMAAAAWM/3WAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAPUExURf8AAAD/AAD/AAAA////N6TVyAAAAAJ0Uk5T/wDltzBKAAACyElEQVR42u3d246rIBBENcr//7rLElpa0m7YpG6bJ+PcpA4C0Y0DAAAAAAAAAAAAAADAb3K6rQ3+a/PSd6v1nL5w+n1Z/TrN1+vN2llhJ5/b2rN2hV3/5y8oV/b5zVl5tW/22t/3uDKz3y2Zo4Vn/P742u0G61P7JgOfV6z5o0S+f1V5kMvX+Vbv89N3Z32+4fX/m/5y/fN3wF+tU97f26z0f0H580Gg8/X63S6/T/j/AHD148R9/bI/f0x/P61/b/1oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AuDrx8R9/bI/v0x/f23/b/3oAfsLgK8fE/f1y/78Mv39tf2/9aAH7C8Avn5M3Ncv+/PL9PfX9v/WgR+wv8D4+jFxX7/szy/T31/b/1oHfsL+AvBHwV+Qz0Gj4QAAAABJRU5ErkJggg==';
 
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -71,7 +71,6 @@ const App: React.FC = () => {
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   const audioContextRef = useRef<AudioContext | null>(null);
-  const loopingAudioRef = useRef<HTMLAudioElement>(null);
   const clogImageRef = useRef<HTMLImageElement | null>(null);
   
   const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], swellings: Swelling[]}>({ dents: [], spiders: [], needles: [], bruises: [], swellings: [] });
@@ -711,18 +710,6 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [spiders.length, faceBox]);
 
-  useEffect(() => {
-    const audio = loopingAudioRef.current;
-    if (!audio) return;
-
-    if (activeTool === 'clogStrike') {
-        audio.play().catch(e => console.error("Audio play failed:", e));
-    } else {
-        audio.pause();
-        audio.currentTime = 0;
-    }
-  }, [activeTool]);
-
   const runFaceDetection = useCallback(async (file: File) => {
     setIsLoading(true);
     setError(null);
@@ -917,6 +904,74 @@ const App: React.FC = () => {
       thump.stop(now + 0.2);
   }, []);
 
+  const playClogSound = useCallback((strength: number) => {
+    if (!audioContextRef.current) {
+        try {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } catch (e) {
+            console.error("Web Audio API is not supported.", e);
+            return;
+        }
+    }
+    const audioContext = audioContextRef.current;
+    if (!audioContext || audioContext.state === 'suspended') {
+        audioContext?.resume();
+    }
+    if (!audioContext) return;
+
+    const now = audioContext.currentTime;
+    const s = strength / 100;
+
+    const bufferSize = audioContext.sampleRate * 0.1;
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+
+    const noiseSource = audioContext.createBufferSource();
+    noiseSource.buffer = buffer;
+
+    const noiseGain = audioContext.createGain();
+    const noiseVolume = 0.3 + s * 0.4;
+    noiseGain.gain.setValueAtTime(0, now);
+    noiseGain.gain.linearRampToValueAtTime(noiseVolume, now + 0.005);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1 + s * 0.05);
+
+    const bandpass = audioContext.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    const clackFreq = 1200 + s * 800;
+    bandpass.frequency.value = clackFreq;
+    bandpass.Q.value = 1.5;
+
+    noiseSource.connect(bandpass);
+    bandpass.connect(noiseGain);
+    noiseGain.connect(audioContext.destination);
+
+    const thump = audioContext.createOscillator();
+    thump.type = 'triangle';
+    
+    const thumpGain = audioContext.createGain();
+    const thumpStartFreq = 150 - s * 50;
+    const thumpEndFreq = 80;
+    const thumpVolume = 0.2 + s * 0.3;
+
+    thump.frequency.setValueAtTime(thumpStartFreq, now);
+    thump.frequency.exponentialRampToValueAtTime(thumpEndFreq, now + 0.1);
+    
+    thumpGain.gain.setValueAtTime(thumpVolume, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+    thump.connect(thumpGain);
+    thumpGain.connect(audioContext.destination);
+    
+    noiseSource.start(now);
+    thump.start(now);
+    
+    noiseSource.stop(now + 0.2);
+    thump.stop(now + 0.2);
+}, []);
+
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
@@ -1026,6 +1081,13 @@ const App: React.FC = () => {
       setCoins(prev => prev + 5);
     } else if (activeTool === 'clogStrike') {
         const slapCount = 1 + Math.floor((strength / 100) * 5);
+        const slapDuration = 150 - (strength / 100) * 100;
+
+        for (let i = 0; i < slapCount; i++) {
+            setTimeout(() => {
+                playClogSound(strength);
+            }, i * slapDuration + (slapDuration * 0.45));
+        }
 
         const newAnimation: ClogAnimation = {
             id: performance.now(),
@@ -1172,7 +1234,6 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/40 via-slate-900 to-black text-slate-100 flex flex-col items-center p-4 sm:p-6 lg:p-8 font-sans">
-      <audio ref={loopingAudioRef} src="/extracted_audio.mp3" loop />
       <div className="w-full max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-6 text-yellow-300">
             <h1 className="text-2xl sm:text-3xl font-bold">打小人! Poppet Punch!</h1>
