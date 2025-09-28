@@ -101,12 +101,9 @@ export const SkullIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const TornadoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+export const SlipperIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M22,6H2a1,1,0,0,0,0,2H22a1,1,0,0,0,0-2Z"/>
-    <path d="M19,10H5a1,1,0,0,0,0,2H19a1,1,0,0,0,0-2Z"/>
-    <path d="M16,14H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/>
-    <path d="M13,18H11a1,1,0,0,0,0,2h2a1,1,0,0,0,0-2Z"/>
+    <path d="M15.18,3.34C13.29,2.4,11.03,3.05,9.6,4.48L5.75,8.33c-1.9,1.9-1.5,4.83.6,6.17l-2.5,2.5c-.39.39-.39,1.02,0,1.41l.71.71c.39.39,1.02.39,1.41,0l2.5-2.5c1.34,2.1,4.27,2.5,6.17.6l3.85-3.85C20.95,9.58,18.06,4.71,15.18,3.34Z"/>
   </svg>
 );
 

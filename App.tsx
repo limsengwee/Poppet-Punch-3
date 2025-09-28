@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation, SlipperAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, BlisterIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, BlisterIcon, SkullIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon, SlipperIcon
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -35,7 +35,7 @@ const tools = [
     { id: 'shatter', name: '碎裂', icon: CrackIcon },
     { id: 'ugly', name: '丑化', icon: UglyIcon },
     { id: 'skull', name: '骷髅', icon: SkullIcon },
-    { id: 'tornado', name: '龙卷风', icon: TornadoIcon },
+    { id: 'slipperPunch', name: '拖鞋攻击', icon: SlipperIcon },
 ];
 
 type ToolId = typeof tools[number]['id'];
@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [bruises, setBruises] = useState<Bruise[]>([]);
   const [swellings, setSwellings] = useState<Swelling[]>([]);
   const [slapAnimations, setSlapAnimations] = useState<SlapAnimation[]>([]);
+  const [slipperAnimations, setSlipperAnimations] = useState<SlipperAnimation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -61,14 +62,16 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ToolId>('mallet');
   const [strength, setStrength] = useState<number>(50);
   const [hasDestructiveChanges, setHasDestructiveChanges] = useState<boolean>(false);
+  const [customSlapSound, setCustomSlapSound] = useState<{url: string, name: string} | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const soundInputRef = useRef<HTMLInputElement>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], swellings: Swelling[]}>({ dents: [], spiders: [], needles: [], bruises: [], swellings: [] });
 
@@ -167,14 +170,11 @@ const App: React.FC = () => {
         const headRadius = 4.5;
         const shaftWidth = 2;
 
-        // 1. Puncture Wound - more detailed
-        // Dark inner hole
         ctx.fillStyle = 'rgba(10, 0, 0, 0.6)';
         ctx.beginPath();
         ctx.arc(cx, cy, shaftWidth / 1.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Irritated skin around the puncture
         const woundGradient = ctx.createRadialGradient(cx, cy, shaftWidth, cx, cy, headRadius * 2.5);
         woundGradient.addColorStop(0, 'rgba(150, 50, 50, 0.4)');
         woundGradient.addColorStop(0.7, 'rgba(100, 30, 30, 0.2)');
@@ -184,12 +184,10 @@ const App: React.FC = () => {
         ctx.arc(cx, cy, headRadius * 2.5, 0, Math.PI * 2);
         ctx.fill();
         
-        // 2. Needle drawing
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(needle.rotation);
 
-        // Shadow for the needle. Cast it away from the needle's "exit" point.
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 5;
         ctx.shadowOffsetX = 3;
@@ -197,31 +195,27 @@ const App: React.FC = () => {
 
         const entryOffset = -2;
 
-        // Needle Shaft with gradient for 3D effect
         const shaftGradient = ctx.createLinearGradient(-shaftWidth, 0, shaftWidth, 0);
-        shaftGradient.addColorStop(0, '#71717a'); // Dark edge
-        shaftGradient.addColorStop(0.4, '#e5e5e5'); // Highlight
-        shaftGradient.addColorStop(1, '#a1a1aa'); // Main color
+        shaftGradient.addColorStop(0, '#71717a');
+        shaftGradient.addColorStop(0.4, '#e5e5e5');
+        shaftGradient.addColorStop(1, '#a1a1aa');
 
         ctx.strokeStyle = shaftGradient;
         ctx.lineWidth = shaftWidth;
         ctx.lineCap = 'round';
         
         ctx.beginPath();
-        ctx.moveTo(0, entryOffset); // Start slightly "inside" the hole to create depth
+        ctx.moveTo(0, entryOffset);
         ctx.lineTo(0, -length);
         ctx.stroke();
 
-        // Needle Head
         ctx.fillStyle = needle.color;
         ctx.beginPath();
         ctx.arc(0, -length, headRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Reset shadow for head highlight
         ctx.shadowColor = 'transparent';
 
-        // Highlight on the head
         const gradient = ctx.createRadialGradient(
             -headRadius * 0.4, -length - headRadius * 0.4, 0,
             -headRadius * 0.4, -length - headRadius * 0.4, headRadius * 1.5
@@ -244,8 +238,6 @@ const App: React.FC = () => {
       const intensity = bruise.intensity;
 
       ctx.save();
-
-      // 1. Irritated skin base
       ctx.globalCompositeOperation = 'overlay';
       const irritationRadius = Math.max(radiusX, radiusY) * 2.5;
       const irritationGradient = ctx.createRadialGradient(
@@ -260,11 +252,9 @@ const App: React.FC = () => {
       ctx.arc(centerX, centerY, irritationRadius, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Create main ellipse path
       ctx.beginPath();
       ctx.ellipse(centerX, centerY, radiusX, radiusY, bruise.rotation, 0, 2 * Math.PI);
 
-      // 2. Inner shadow for depth
       ctx.globalCompositeOperation = 'multiply';
       const shadowGradient = ctx.createRadialGradient(
           centerX + radiusX * 0.3, centerY + radiusY * 0.3, 0,
@@ -275,7 +265,6 @@ const App: React.FC = () => {
       ctx.fillStyle = shadowGradient;
       ctx.fill();
 
-      // 3. Blister Body fill (the liquid)
       ctx.globalCompositeOperation = 'soft-light';
       const bodyGradient = ctx.createRadialGradient(
           centerX - radiusX * 0.3, centerY - radiusY * 0.3, 0,
@@ -286,7 +275,6 @@ const App: React.FC = () => {
       ctx.fillStyle = bodyGradient;
       ctx.fill();
       
-      // 4. Glossy Highlight
       ctx.globalCompositeOperation = 'overlay';
       const highlightRadius = Math.max(radiusX, radiusY);
       const highlightGradient = ctx.createRadialGradient(
@@ -304,7 +292,7 @@ const App: React.FC = () => {
     
     swellings.forEach(swell => {
       const age = performance.now() - swell.createdAt;
-      const animDuration = 500; // fade in duration
+      const animDuration = 500;
 
       const progress = Math.min(age / animDuration, 1);
       const easeOutProgress = 1 - Math.pow(1 - progress, 3);
@@ -318,7 +306,6 @@ const App: React.FC = () => {
       
       ctx.save();
       
-      // Layer 1: Base redness
       ctx.globalCompositeOperation = 'overlay';
       const baseRadius = Math.max(radiusX, radiusY) * 1.8;
       const grad1 = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius);
@@ -329,7 +316,6 @@ const App: React.FC = () => {
       ctx.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Layer 2: Swelling Highlight
       ctx.globalCompositeOperation = 'soft-light';
       const grad2 = ctx.createRadialGradient(
           centerX - radiusX * 0.2, centerY - radiusY * 0.2, 0,
@@ -342,7 +328,6 @@ const App: React.FC = () => {
       ctx.ellipse(centerX, centerY, radiusX, radiusY, swell.rotation, 0, Math.PI * 2);
       ctx.fill();
       
-      // Layer 3: Impact core
       ctx.globalCompositeOperation = 'color-burn';
       const grad3 = ctx.createRadialGradient(
           centerX, centerY, 0,
@@ -362,7 +347,7 @@ const App: React.FC = () => {
 
     slapAnimations.forEach(anim => {
         const age = now - anim.createdAt;
-        const duration = 400; //ms
+        const duration = 400;
 
         if (age > duration) return;
 
@@ -376,19 +361,19 @@ const App: React.FC = () => {
         let currentDist = 0;
         let alpha = 1.0;
         
-        if (progress < 0.25) { // Fast approach
+        if (progress < 0.25) {
             const t = progress / 0.25;
             const easeOutT = 1 - Math.pow(1 - t, 3);
             currentDist = startDist * (1 - easeOutT);
             alpha = t;
-        } else { // Hold and retract
+        } else {
             const t = (progress - 0.25) / 0.75;
             const easeInT = t * t;
             currentDist = easeInT * (startDist * 0.5);
             alpha = 1 - t;
         }
 
-        const angle = anim.rotation - Math.PI / 2; // Hand comes from the side
+        const angle = anim.rotation - Math.PI / 2;
         const handX = offsetX + anim.x * finalWidth + Math.cos(angle) * currentDist;
         const handY = offsetY + anim.y * finalHeight + Math.sin(angle) * currentDist;
         
@@ -434,12 +419,75 @@ const App: React.FC = () => {
         ctx.restore();
     });
 
+    slipperAnimations.forEach(anim => {
+      const age = now - anim.createdAt;
+      const slapDuration = 150 - (strength/100) * 100; // Faster with more strength
+      const totalDuration = anim.totalSlaps * slapDuration;
 
-  }, [dents, spiders, needles, bruises, swellings, slapAnimations]);
+      if (age > totalDuration) return;
+
+      ctx.save();
+      const size = anim.size * Math.min(finalWidth, finalHeight);
+      
+      const currentSlap = Math.floor(age / slapDuration);
+      const progressInSlap = (age % slapDuration) / slapDuration;
+
+      let rotationOffset = 0;
+      let distOffset = 0;
+      const windUpDist = size * 1.5;
+
+      if (progressInSlap < 0.4) { // Wind up
+        const t = progressInSlap / 0.4;
+        distOffset = -windUpDist * (1 - Math.pow(1 - t, 2));
+        rotationOffset = -0.5 * (1 - Math.pow(1 - t, 2));
+      } else if (progressInSlap < 0.5) { // Hit
+        const t = (progressInSlap - 0.4) / 0.1;
+        distOffset = -windUpDist * (1 - t);
+        rotationOffset = -0.5 * (1-t);
+      } else { // Retract
+        const t = (progressInSlap - 0.5) / 0.5;
+        distOffset = size * 0.2 * t;
+        rotationOffset = 0.2 * t;
+      }
+      
+      const angle = anim.rotation - Math.PI / 2;
+      const slipperX = offsetX + anim.x * finalWidth + Math.cos(angle) * distOffset;
+      const slipperY = offsetY + anim.y * finalHeight + Math.sin(angle) * distOffset;
+
+      ctx.translate(slipperX, slipperY);
+      ctx.rotate(anim.rotation + rotationOffset);
+      
+      const drawSlipper = (ctx: CanvasRenderingContext2D, size: number) => {
+        const w = size;
+        const h = size * 2.2;
+        ctx.fillStyle = '#c2410c'; // Slipper color
+        ctx.beginPath();
+        ctx.moveTo(-w/2, -h/2);
+        ctx.bezierCurveTo(-w*0.8, -h*0.1, -w*0.8, h*0.3, -w/2, h/2);
+        ctx.lineTo(w/2, h/2);
+        ctx.bezierCurveTo(w*0.8, h*0.3, w*0.8, -h*0.1, w/2, -h/2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#451a03'; // Strap
+        ctx.beginPath();
+        ctx.rect(-w*0.4, -h * 0.25, w * 0.8, h * 0.2);
+        ctx.fill();
+      };
+
+      drawSlipper(ctx, size);
+
+      ctx.restore();
+    });
+
+
+  }, [dents, spiders, needles, bruises, swellings, slapAnimations, slipperAnimations, strength]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
       URL.revokeObjectURL(imageSrc);
+    }
+    if (customSlapSound) {
+      URL.revokeObjectURL(customSlapSound.url);
     }
     setImageFile(null);
     setImageSrc(null);
@@ -450,15 +498,20 @@ const App: React.FC = () => {
     setBruises([]);
     setSwellings([]);
     setSlapAnimations([]);
+    setSlipperAnimations([]);
+    setCustomSlapSound(null);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
     setMousePosition(null);
     setHitCount(0);
-    setCoins(480); // Reset coins to initial value
+    setCoins(480);
     setHasDestructiveChanges(false);
     if(fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if(soundInputRef.current) {
+      soundInputRef.current.value = "";
     }
     const canvas = canvasRef.current;
     if (canvas) {
@@ -466,7 +519,7 @@ const App: React.FC = () => {
       ctx?.clearRect(0, 0, canvas.width, canvas.height);
     }
     offscreenCanvasRef.current = null;
-  }, [imageSrc]);
+  }, [imageSrc, customSlapSound]);
   
   const resetEffects = useCallback(() => {
     setDents([]);
@@ -475,6 +528,7 @@ const App: React.FC = () => {
     setBruises([]);
     setSwellings([]);
     setSlapAnimations([]);
+    setSlipperAnimations([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
 
@@ -585,36 +639,40 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [dents, redrawCanvas]);
 
-    useEffect(() => {
-        let animationFrameId: number;
-        const swellingDuration = 500;
-        const slapAnimationDuration = 400;
+  useEffect(() => {
+      let animationFrameId: number;
+      const swellingDuration = 500;
+      const slapAnimationDuration = 400;
+      const slipperSlapDuration = 150 - (strength/100) * 100;
+      
+      const needsAnimation = 
+          swellings.some(s => (performance.now() - s.createdAt) < swellingDuration) ||
+          slapAnimations.length > 0 ||
+          slipperAnimations.length > 0;
 
-        const needsAnimation = 
-            swellings.some(s => (performance.now() - s.createdAt) < swellingDuration) ||
-            slapAnimations.length > 0;
+      if (!needsAnimation) return;
 
-        if (!needsAnimation) return;
+      const animate = () => {
+          const now = performance.now();
+          const stillNeedsSwellingAnim = swellings.some(s => (now - s.createdAt) < swellingDuration);
+          const stillNeedsSlapAnim = slapAnimations.some(a => (now - a.createdAt) < slapAnimationDuration);
+          const stillNeedsSlipperAnim = slipperAnimations.some(a => (now - a.createdAt) < a.totalSlaps * slipperSlapDuration);
 
-        const animate = () => {
-            const now = performance.now();
-            const stillNeedsSwellingAnim = swellings.some(s => (now - s.createdAt) < swellingDuration);
-            const stillNeedsSlapAnim = slapAnimations.some(a => (now - a.createdAt) < slapAnimationDuration);
+          if (stillNeedsSwellingAnim || stillNeedsSlapAnim || stillNeedsSlipperAnim) {
+              redrawCanvas();
+              animationFrameId = requestAnimationFrame(animate);
+          } else {
+              setSlapAnimations([]);
+              setSlipperAnimations([]);
+          }
+      };
 
-            if (stillNeedsSwellingAnim || stillNeedsSlapAnim) {
-                redrawCanvas();
-                animationFrameId = requestAnimationFrame(animate);
-            } else {
-                setSlapAnimations([]); // Clean up finished animations
-            }
-        };
+      animationFrameId = requestAnimationFrame(animate);
 
-        animationFrameId = requestAnimationFrame(animate);
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-    }, [swellings, slapAnimations, redrawCanvas]);
+      return () => {
+          cancelAnimationFrame(animationFrameId);
+      };
+  }, [swellings, slapAnimations, slipperAnimations, redrawCanvas, strength]);
 
   useEffect(() => {
     if (spiders.length === 0) return;
@@ -700,7 +758,6 @@ const App: React.FC = () => {
       const img = imageRef.current;
       if (img && imageSrc) {
           img.addEventListener('load', handleImageLoaded);
-          // If the image is already loaded (e.g., from cache), trigger detection manually.
           if (img.complete && img.naturalWidth > 0) {
               handleImageLoaded();
           }
@@ -713,22 +770,30 @@ const App: React.FC = () => {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (imageSrc) URL.revokeObjectURL(imageSrc);
+      resetState();
       setImageFile(file);
       setImageSrc(URL.createObjectURL(file));
-      
-      // Reset everything for the new image
-      setFaceBox(null);
-      setDents([]);
-      setSpiders([]);
-      setNeedles([]);
-      setBruises([]);
-      setSwellings([]);
-      setSlapAnimations([]);
-      setHitCount(0);
-      setHasDestructiveChanges(false);
-      offscreenCanvasRef.current = null;
     }
+  };
+  
+  const handleSoundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        if (customSlapSound) {
+            URL.revokeObjectURL(customSlapSound.url);
+        }
+        setCustomSlapSound({url: URL.createObjectURL(file), name: file.name});
+    }
+  };
+
+  const clearCustomSound = () => {
+      if (customSlapSound) {
+          URL.revokeObjectURL(customSlapSound.url);
+          setCustomSlapSound(null);
+          if (soundInputRef.current) {
+              soundInputRef.current.value = "";
+          }
+      }
   };
 
   const getPosOnImage = (event: React.MouseEvent<HTMLElement>) => {
@@ -740,78 +805,6 @@ const App: React.FC = () => {
     const { offsetX, offsetY, finalWidth, finalHeight } = renderInfo.current;
     if (mouseX < offsetX || mouseX > offsetX + finalWidth || mouseY < offsetY || mouseY > offsetY + finalHeight) return null;
     return { x: (mouseX - offsetX) / finalWidth, y: (mouseY - offsetY) / finalHeight, absoluteX: mouseX, absoluteY: mouseY };
-  };
-  
-  const applyTornadoEffect = (canvasX: number, canvasY: number) => {
-    const offscreenCanvas = offscreenCanvasRef.current;
-    if (!offscreenCanvas) return;
-
-    const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-    if (!offscreenCtx) return;
-
-    const { finalWidth, finalHeight, offsetX, offsetY } = renderInfo.current;
-    
-    const imageX = ((canvasX - offsetX) / finalWidth) * offscreenCanvas.width;
-    const imageY = ((canvasY - offsetY) / finalHeight) * offscreenCanvas.height;
-
-    const radius = (strength / 100) * (Math.min(offscreenCanvas.width, offscreenCanvas.height) * 0.15);
-    const angle = (strength / 100) * Math.PI;
-
-    if (radius <= 0) return;
-
-    const startX = Math.floor(Math.max(0, imageX - radius));
-    const startY = Math.floor(Math.max(0, imageY - radius));
-    const width = Math.floor(Math.min(offscreenCanvas.width, imageX + radius)) - startX;
-    const height = Math.floor(Math.min(offscreenCanvas.height, imageY + radius)) - startY;
-
-    if (width <= 0 || height <= 0) return;
-
-    const originalData = offscreenCtx.getImageData(startX, startY, width, height);
-    const warpedData = offscreenCtx.createImageData(width, height);
-
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const currentX = startX + x;
-            const currentY = startY + y;
-
-            const dx = currentX - imageX;
-            const dy = currentY - imageY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            const pixelIndex = (y * width + x) * 4;
-
-            if (distance < radius) {
-                const percent = 1 - (distance / radius);
-                const theta = Math.atan2(dy, dx);
-                const twistAngle = percent * percent * angle;
-
-                const srcX = Math.floor(imageX + distance * Math.cos(theta - twistAngle));
-                const srcY = Math.floor(imageY + distance * Math.sin(theta - twistAngle));
-                
-                if (srcX >= startX && srcX < startX + width && srcY >= startY && srcY < startY + height) {
-                    const srcIndex = ((srcY - startY) * width + (srcX - startX)) * 4;
-                    warpedData.data[pixelIndex] = originalData.data[srcIndex];
-                    warpedData.data[pixelIndex + 1] = originalData.data[srcIndex + 1];
-                    warpedData.data[pixelIndex + 2] = originalData.data[srcIndex + 2];
-                    warpedData.data[pixelIndex + 3] = originalData.data[srcIndex + 3];
-                } else {
-                    warpedData.data[pixelIndex] = originalData.data[pixelIndex];
-                    warpedData.data[pixelIndex + 1] = originalData.data[pixelIndex + 1];
-                    warpedData.data[pixelIndex + 2] = originalData.data[pixelIndex + 2];
-                    warpedData.data[pixelIndex + 3] = originalData.data[pixelIndex + 3];
-                }
-            } else {
-                warpedData.data[pixelIndex] = originalData.data[pixelIndex];
-                warpedData.data[pixelIndex + 1] = originalData.data[pixelIndex + 1];
-                warpedData.data[pixelIndex + 2] = originalData.data[pixelIndex + 2];
-                warpedData.data[pixelIndex + 3] = originalData.data[pixelIndex + 3];
-            }
-        }
-    }
-    
-    offscreenCtx.putImageData(warpedData, startX, startY);
-    setHasDestructiveChanges(true);
-    redrawCanvas();
   };
 
     const handleAIEffect = async (promptGenerator: (strength: number) => string) => {
@@ -856,7 +849,6 @@ const App: React.FC = () => {
                 setCoins(prev => prev + 10);
             } else {
                 setError("AI failed to generate the effect. These effects can be tricky, so please try again or adjust the strength.");
-                // Restore non-destructive effects on failure
                 setDents(nonDestructiveEffectsBackup.current.dents);
                 setSpiders(nonDestructiveEffectsBackup.current.spiders);
                 setNeedles(nonDestructiveEffectsBackup.current.needles);
@@ -866,7 +858,6 @@ const App: React.FC = () => {
         } catch (e) {
             console.error(e);
             setError("An error occurred while applying the AI effect.");
-            // Restore non-destructive effects on error
             setDents(nonDestructiveEffectsBackup.current.dents);
             setSpiders(nonDestructiveEffectsBackup.current.spiders);
             setNeedles(nonDestructiveEffectsBackup.current.needles);
@@ -895,14 +886,13 @@ const App: React.FC = () => {
       const now = audioContext.currentTime;
       const s = strength / 100;
 
-      // Layer 1: The low-frequency "thump" of the impact
       const thump = audioContext.createOscillator();
       thump.type = 'sine';
       
       const thumpGain = audioContext.createGain();
-      const thumpStartFreq = 180 - s * 80; // Stronger slap = lower frequency (180Hz down to 100Hz)
+      const thumpStartFreq = 180 - s * 80;
       const thumpEndFreq = 50;
-      const thumpVolume = 0.4 + s * 0.4; // 0.4 to 0.8 volume
+      const thumpVolume = 0.4 + s * 0.4;
 
       thump.frequency.setValueAtTime(thumpStartFreq, now);
       thump.frequency.exponentialRampToValueAtTime(thumpEndFreq, now + 0.15);
@@ -913,29 +903,26 @@ const App: React.FC = () => {
       thump.connect(thumpGain);
       thumpGain.connect(audioContext.destination);
 
-      // Layer 2: The high-frequency "crack" of the slap
-      const bufferSize = audioContext.sampleRate * 0.1; // 0.1s of noise is enough
+      const bufferSize = audioContext.sampleRate * 0.1;
       const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
       const output = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1; // White noise
+          output[i] = Math.random() * 2 - 1;
       }
 
       const crack = audioContext.createBufferSource();
       crack.buffer = buffer;
 
       const crackGain = audioContext.createGain();
-      const crackVolume = 0.5 + s * 0.5; // 0.5 to 1.0 volume
+      const crackVolume = 0.5 + s * 0.5;
       
-      // A very sharp attack and quick decay for the "crack"
       crackGain.gain.setValueAtTime(0, now);
       crackGain.gain.linearRampToValueAtTime(crackVolume, now + 0.002);
       crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 + s * 0.02);
 
       const bandpass = audioContext.createBiquadFilter();
       bandpass.type = 'bandpass';
-      // Stronger slap = higher frequency, sharper sound
-      const crackFreq = 2000 + s * 5000; // 2000Hz up to 7000Hz
+      const crackFreq = 2000 + s * 5000;
       bandpass.frequency.value = crackFreq;
       bandpass.Q.value = 0.8;
 
@@ -946,8 +933,21 @@ const App: React.FC = () => {
       thump.start(now);
       crack.start(now);
       
-      thump.stop(now + 0.2); // Clean up the oscillator
+      thump.stop(now + 0.2);
   }, []);
+
+  const playSlipperSound = useCallback(() => {
+    if (customSlapSound) {
+        if (!audioRef.current) {
+            audioRef.current = new Audio();
+        }
+        audioRef.current.src = customSlapSound.url;
+        audioRef.current.volume = Math.min(1, strength / 100);
+        audioRef.current.play().catch(e => console.error("Error playing custom sound:", e));
+    } else {
+        playSlapSound(strength);
+    }
+  }, [customSlapSound, strength, playSlapSound]);
 
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
@@ -1056,6 +1056,28 @@ const App: React.FC = () => {
       setBruises(prev => [...prev, ...newBruises]);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
+    } else if (activeTool === 'slipperPunch') {
+        const slapCount = 1 + Math.floor((strength / 100) * 5);
+        const slapDuration = 150 - (strength/100) * 100;
+
+        const newAnimation: SlipperAnimation = {
+            id: performance.now(),
+            x: pos.x,
+            y: pos.y,
+            size: 0.06 + (strength / 100) * 0.05,
+            rotation: (Math.random() - 0.5) * 0.6,
+            createdAt: performance.now(),
+            totalSlaps: slapCount,
+        };
+        setSlipperAnimations(prev => [...prev, newAnimation]);
+        
+        // Play sound for each slap
+        for (let i = 0; i < slapCount; i++) {
+            setTimeout(() => playSlipperSound(), i * slapDuration + (slapDuration * 0.45));
+        }
+
+        setHitCount(prev => prev + slapCount);
+        setCoins(prev => prev + 5 * slapCount);
     } else if (activeTool === 'shatter') {
         const promptGenerator = (strength: number) => {
              let prompt = "Transform the person's skin into a cracked, dry earth texture. The cracks should be noticeable and deep. The skin should look weathered. Preserve the original color and detail of the eyes.";
@@ -1121,13 +1143,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
     }
     
     if (!canHit) return;
-
-    if (activeTool === 'tornado') {
-        isDraggingRef.current = true;
-        applyTornadoEffect(pos.absoluteX, pos.absoluteY);
-    } else {
-        applyToolEffect(pos);
-    }
+    applyToolEffect(pos);
   };
   
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1136,11 +1152,9 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
     setMousePosition(currentMousePos);
     
     const pos = getPosOnImage(event);
-    if (!pos) return;
-
-
-    if (isDraggingRef.current && activeTool === 'tornado') {
-        applyTornadoEffect(pos.absoluteX, pos.absoluteY);
+    if (!pos) {
+      setIsHoveringFace(false);
+      return;
     }
 
     if (activeTool === 'mallet') {
@@ -1163,16 +1177,18 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
   };
 
   const handleMouseUp = () => {
-    isDraggingRef.current = false;
+    // No action needed for current tools on mouse up
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+  const triggerSoundInput = () => soundInputRef.current?.click();
   
   const getCursor = () => {
       if (!imageSrc) return 'default';
+      if (isLoading) return 'wait';
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
       if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly', 'skull'].includes(activeTool)) return 'crosshair';
-      if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
+      if (activeTool === 'slipperPunch') return 'pointer';
       if (activeTool === 'hand') return 'grab';
       return 'default';
   }
@@ -1233,7 +1249,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                       onMouseDown={handleMouseDown}
                       onMouseMove={handleMouseMove}
                       onMouseUp={handleMouseUp}
-                      onMouseLeave={() => { setIsHoveringFace(false); setMousePosition(null); isDraggingRef.current = false; }}
+                      onMouseLeave={() => { setIsHoveringFace(false); setMousePosition(null); }}
                       style={{ cursor: getCursor() }}
                     >
                         <img ref={imageRef} src={imageSrc} alt="Uploaded" className="w-full h-full object-contain block opacity-0 pointer-events-none" />
@@ -1287,6 +1303,21 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                     />
                 </div>
 
+                <div id="custom-sound" className="bg-slate-800/40 p-3 rounded-lg">
+                    <h4 className="font-bold text-slate-300 text-sm mb-2">自定义音效 (拖鞋)</h4>
+                    <input type="file" accept="audio/mpeg" onChange={handleSoundUpload} ref={soundInputRef} className="hidden" />
+                    {customSlapSound ? (
+                        <div className="bg-slate-700/50 text-xs text-slate-300 rounded-md px-2 py-1 flex items-center justify-between">
+                            <span className="truncate w-40">{customSlapSound.name}</span>
+                            <button onClick={clearCustomSound} className="text-red-400 hover:text-red-300 font-bold text-lg">&times;</button>
+                        </div>
+                    ) : (
+                        <button onClick={triggerSoundInput} className="w-full text-sm text-center py-2 bg-slate-600 rounded-md hover:bg-slate-500 transition-colors">
+                            上传 MP3
+                        </button>
+                    )}
+                </div>
+
                 <button 
                     onClick={resetEffects}
                     disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && swellings.length === 0 && !hasDestructiveChanges}
@@ -1302,30 +1333,8 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                         <p className="text-5xl font-bold text-yellow-300">{hitCount}</p>
                         <p className="text-slate-400 text-sm">总计击打次数</p>
                     </div>
-                    <div className="w-full">
-                        <div className="flex justify-between text-xs text-slate-400 mb-1">
-                            <span>进度</span>
-                            <span>{hitCount > 0 ? 1 : 0}/1</span>
-                        </div>
-                        <div className="w-full bg-slate-700 rounded-full h-2.5">
-                            <div className="bg-yellow-500 h-2.5 rounded-full" style={{width: `${hitCount > 0 ? 100 : 0}%`}}></div>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">下一个里程碑: 第一击</p>
-                    </div>
                 </div>
 
-                <div id="rewards" className="bg-slate-800/40 p-4 rounded-lg text-sm">
-                    <h3 className="text-xl font-bold mb-3">奖励</h3>
-                    <div className="flex justify-between items-center">
-                        <span className="text-slate-400">当前出价:</span>
-                        <span className="font-bold text-lg text-yellow-300 flex items-center gap-1"><CoinIcon className="w-4 h-4" /> 480</span>
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                        <span className="text-slate-400">每次奖励:</span>
-                        <span className="font-bold text-lg text-green-400">+5 金币</span>
-                    </div>
-                </div>
-                
                 <div className="mt-auto flex flex-col gap-2">
                     <button onClick={resetState} className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-800 text-white font-bold rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
                         <RestartIcon className="w-6 h-6" />
