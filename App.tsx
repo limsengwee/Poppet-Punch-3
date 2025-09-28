@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaceBoundingBox, Dent, Spider, Needle, Bruise } from './types';
+import { FaceBoundingBox, Dent, Spider, Needle, Bruise, SlapMark } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
     MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
@@ -26,6 +27,48 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
   );
 };
 
+const drawFinger = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rot: number) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+};
+
+const drawHandPrint = (ctx: CanvasRenderingContext2D, size: number) => {
+    // Palm - a rounded rectangle. Using ellipse for a softer look.
+    const palmWidth = size;
+    const palmHeight = size * 1.1;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, palmWidth / 2, palmHeight / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fingers - ellipses
+    const fingerWidth = size * 0.25;
+    const fingerLength = size * 0.9;
+    const fingerBaseY = -palmHeight / 2;
+
+    // Little finger
+    drawFinger(ctx, -palmWidth * 0.35, fingerBaseY, fingerWidth * 0.8, fingerLength * 0.7, 0.2);
+    // Ring finger
+    drawFinger(ctx, -palmWidth * 0.1, fingerBaseY, fingerWidth, fingerLength * 0.9, 0.05);
+    // Middle finger
+    drawFinger(ctx, palmWidth * 0.15, fingerBaseY, fingerWidth, fingerLength, -0.05);
+    // Index finger
+    drawFinger(ctx, palmWidth * 0.38, fingerBaseY, fingerWidth * 0.95, fingerLength * 0.85, -0.2);
+
+    // Thumb - rotated ellipse
+    ctx.save();
+    ctx.translate(-palmWidth/2 * 0.8, palmHeight/2 * 0.4);
+    ctx.rotate(-0.9);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, fingerWidth * 1.1, fingerLength * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+};
+
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
@@ -48,6 +91,7 @@ const App: React.FC = () => {
   const [spiders, setSpiders] = useState<Spider[]>([]);
   const [needles, setNeedles] = useState<Needle[]>([]);
   const [bruises, setBruises] = useState<Bruise[]>([]);
+  const [slapMarks, setSlapMarks] = useState<SlapMark[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -67,7 +111,7 @@ const App: React.FC = () => {
   const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   
-  const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[]}>({ dents: [], spiders: [], needles: [], bruises: [] });
+  const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], slapMarks: SlapMark[]}>({ dents: [], spiders: [], needles: [], bruises: [], slapMarks: [] });
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -298,8 +342,36 @@ const App: React.FC = () => {
 
       ctx.restore();
     });
+    
+    slapMarks.forEach(slap => {
+      const age = performance.now() - slap.createdAt;
+      const slapAnimationDuration = 300; // ms
 
-  }, [dents, spiders, needles, bruises]);
+      const progress = Math.min(age / slapAnimationDuration, 1);
+      const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+
+      const maxAlpha = 0.7;
+      const alpha = easeOutProgress * slap.intensity * maxAlpha;
+      
+      const r = 180 + Math.floor(slap.intensity * 75);
+      const g = 50 - Math.floor(slap.intensity * 20);
+      const b = 50 - Math.floor(slap.intensity * 20);
+      const color = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.globalCompositeOperation = 'multiply';
+
+      ctx.translate(offsetX + slap.x * finalWidth, offsetY + slap.y * finalHeight);
+      ctx.rotate(slap.rotation);
+      
+      const size = slap.size * Math.min(finalWidth, finalHeight);
+      drawHandPrint(ctx, size);
+
+      ctx.restore();
+    });
+
+  }, [dents, spiders, needles, bruises, slapMarks]);
   
   const resetState = useCallback(() => {
     if (imageSrc && imageSrc.startsWith('blob:')) {
@@ -312,6 +384,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setSlapMarks([]);
     setIsLoading(false);
     setError(null);
     setIsHoveringFace(false);
@@ -335,6 +408,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setSlapMarks([]);
     setHitCount(0);
     setHasDestructiveChanges(false);
 
@@ -446,6 +520,22 @@ const App: React.FC = () => {
   }, [dents, redrawCanvas]);
 
   useEffect(() => {
+    let animationFrameId: number;
+    const animationDuration = 300;
+    const needsAnimation = slapMarks.some(s => (performance.now() - s.createdAt) < animationDuration);
+    if (!needsAnimation) return;
+    
+    const animate = () => {
+        redrawCanvas();
+        if (slapMarks.some(s => (performance.now() - s.createdAt) < animationDuration)) {
+            animationFrameId = requestAnimationFrame(animate);
+        }
+    };
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [slapMarks, redrawCanvas]);
+
+  useEffect(() => {
     if (spiders.length === 0) return;
     let animationFrameId: number;
     const animate = () => {
@@ -501,6 +591,7 @@ const App: React.FC = () => {
     setSpiders([]);
     setNeedles([]);
     setBruises([]);
+    setSlapMarks([]);
     setHitCount(0);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -551,6 +642,7 @@ const App: React.FC = () => {
       setSpiders([]);
       setNeedles([]);
       setBruises([]);
+      setSlapMarks([]);
       setHitCount(0);
       setHasDestructiveChanges(false);
       offscreenCanvasRef.current = null;
@@ -646,11 +738,12 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        nonDestructiveEffectsBackup.current = { dents, spiders, needles, bruises };
+        nonDestructiveEffectsBackup.current = { dents, spiders, needles, bruises, slapMarks };
         setDents([]);
         setSpiders([]);
         setNeedles([]);
         setBruises([]);
+        setSlapMarks([]);
 
         try {
             const base64ImageData = offscreenCanvasRef.current.toDataURL(imageFile.type).split(',')[1];
@@ -679,12 +772,13 @@ const App: React.FC = () => {
                 setHitCount(prev => prev + 1);
                 setCoins(prev => prev + 10);
             } else {
-                setError("AI failed to generate the effect. Please try again.");
+                setError("AI failed to generate the effect. These effects can be tricky, so please try again or adjust the strength.");
                 // Restore non-destructive effects on failure
                 setDents(nonDestructiveEffectsBackup.current.dents);
                 setSpiders(nonDestructiveEffectsBackup.current.spiders);
                 setNeedles(nonDestructiveEffectsBackup.current.needles);
                 setBruises(nonDestructiveEffectsBackup.current.bruises);
+                setSlapMarks(nonDestructiveEffectsBackup.current.slapMarks);
             }
         } catch (e) {
             console.error(e);
@@ -694,6 +788,7 @@ const App: React.FC = () => {
             setSpiders(nonDestructiveEffectsBackup.current.spiders);
             setNeedles(nonDestructiveEffectsBackup.current.needles);
             setBruises(nonDestructiveEffectsBackup.current.bruises);
+            setSlapMarks(nonDestructiveEffectsBackup.current.slapMarks);
         } finally {
             setIsLoading(false);
         }
@@ -719,6 +814,20 @@ const App: React.FC = () => {
             shadowColor, highlightColor, createdAt: performance.now(),
         };
         setDents(prevDents => [...prevDents, newDent]);
+        setHitCount(prev => prev + 1);
+        setCoins(prev => prev + 5);
+    } else if (activeTool === 'hand') {
+        const baseSize = 0.08 + (strength / 100) * 0.08;
+        
+        const newSlapMark: SlapMark = {
+            x: pos.x,
+            y: pos.y,
+            size: baseSize,
+            rotation: (Math.random() - 0.5) * 0.5,
+            intensity: strength / 100,
+            createdAt: performance.now(),
+        };
+        setSlapMarks(prev => [...prev, newSlapMark]);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooSpider') {
@@ -817,13 +926,15 @@ Preserve the background, but apply these evil and ugly transformations to the pe
         handleAIEffect(promptGenerator);
     } else if (activeTool === 'skull') {
         const promptGenerator = (strength: number) => {
-            return `Transform the person's face into a photorealistic human skull. The degree of this transformation must be precisely ${strength}%. The effect should look like the skin is being removed or is transparent, revealing the skull structure underneath.
+            return `You are an expert special effects artist. Your task is to transform a person's face into a photorealistic human skull. It is CRITICAL that you follow the strength parameter precisely.
+The transformation should look as if the skin is being peeled away or becoming transparent to reveal the skull underneath.
 
-- At 1%, only a tiny patch of skin (like on a cheek) should become transparent, revealing the bone.
-- At 50%, roughly half of the face's skin should be gone, showing the skull, with peeling or torn skin at the edges of the effect.
-- At 100%, the entire face (skin, nose, eyes, lips) must be replaced by a complete, photorealistic human skull.
+The transformation strength is ${strength} on a scale of 1-100.
+- If strength is 1-10: Reveal a very small, isolated part of the skull, like a patch on the cheekbone or forehead. The effect should be subtle.
+- If strength is around 50: Roughly half the face should be transformed. Create a visually interesting boundary, like peeling or torn flesh, between the skin and the exposed skull.
+- If strength is 90-100: The entire face (skin, nose, eyes, lips) MUST be replaced by a complete, photorealistic, and anatomically correct human skull.
 
-Crucially, you MUST preserve the original background, hair, ears, neck, and any clothing perfectly. The transformation should ONLY apply to the facial area.`
+CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair, ears, neck, and any clothing. The transformation must ONLY apply to the facial area. The result must be photorealistic.`
         };
         handleAIEffect(promptGenerator);
     }
@@ -895,6 +1006,7 @@ Crucially, you MUST preserve the original background, hair, ears, neck, and any 
       if (activeTool === 'mallet' && isHoveringFace) return 'none';
       if (['voodooSpider', 'voodooNeedle', 'fistPunch', 'shatter', 'ugly', 'skull'].includes(activeTool)) return 'crosshair';
       if (activeTool === 'tornado') return isDraggingRef.current ? 'grabbing' : 'grab';
+      if (activeTool === 'hand') return 'grab';
       return 'default';
   }
 
@@ -1010,7 +1122,7 @@ Crucially, you MUST preserve the original background, hair, ears, neck, and any 
 
                 <button 
                     onClick={resetEffects}
-                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && !hasDestructiveChanges}
+                    disabled={dents.length === 0 && spiders.length === 0 && needles.length === 0 && bruises.length === 0 && slapMarks.length === 0 && !hasDestructiveChanges}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-500 transition-colors duration-300 shadow-lg disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                     <BroomIcon className="w-5 h-5" />

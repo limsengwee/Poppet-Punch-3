@@ -44,3 +44,12 @@ export interface Bruise {
   intensity: number; // 0 to 1
   aspectRatio: number;
 }
+
+export interface SlapMark {
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  intensity: number;
+  createdAt: number;
+}
