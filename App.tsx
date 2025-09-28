@@ -753,13 +753,26 @@ const App: React.FC = () => {
         handleAIEffect(promptGenerator);
     } else if (activeTool === 'ugly') {
         const promptGenerator = (strength: number) => {
-            if (strength <= 33) {
-                return "Make the person in this image look slightly more menacing and unattractive. Add subtle, unflattering features like a crooked smile or unsettling eyes.";
-            } else if (strength <= 66) {
-                return "Transform the person in this image to look ugly and evil. Give them a villainous appearance with harsh features, a sinister expression, and perhaps some minor scars or blemishes.";
+            let description = '';
+
+            if (strength <= 10) {
+                description = "add subtle, unflattering features. Think slightly greasy skin, a faint sneer instead of their current expression, and shadows that make their eyes look colder and more menacing. The changes should be very minimal, but distinctly negative.";
+            } else if (strength <= 30) {
+                description = "introduce clear villainous traits. Give them sallow or unhealthy-looking skin, a noticeable scowl or contemptuous expression, and make their eyes appear cruel and unsettling. Perhaps add a small, poorly-healed scar.";
+            } else if (strength <= 60) {
+                description = "significantly distort their features to be grotesque and evil. Introduce unnatural skin textures like warts or blotches, yellowing and crooked teeth visible in a snarl, and a deeply angry or hateful expression. The face should be asymmetrical and unpleasant.";
+            } else if (strength <= 80) {
+                description = "transform them into a monstrous creature. Add demonic or inhuman features like small horns, glowing red eyes, or decaying skin. The features should be heavily distorted and horrifying.";
             } else {
-                return "Dramatically transform the person in this image into a grotesque and evil-looking creature. Use features like twisted expressions, monstrous blemishes, dark, soulless eyes, and an overall horrifying appearance.";
+                description = "make them a nightmarish, terrifying monster, barely recognizable as human. This is maximum ugliness and evil. Think horrific mutations, a face contorted in pure malice, and features that inspire fear and disgust. Do not hold back on the horror elements.";
             }
+
+            return `Make the person in this image look ugly and evil. The intensity of this transformation should be exactly ${strength} on a scale of 1 to 100.
+At all levels, their expression must be negative, such as a scowl, sneer, or look of pure malice. DO NOT make them smile or look happy.
+
+Based on the strength value of ${strength}, ${description}
+
+Preserve the background, but apply these evil and ugly transformations to the person's face and features.`;
         };
         handleAIEffect(promptGenerator);
     }
