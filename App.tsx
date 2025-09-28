@@ -1,11 +1,8 @@
-
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
 import { 
-    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, FistIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
+    MalletIcon, SpinnerIcon, UploadIcon, CameraIcon, CoinIcon, HandIcon, VoodooNeedleIcon, SpiderIcon, BlisterIcon, SkullIcon, TornadoIcon, RestartIcon, BroomIcon, CrackIcon, UglyIcon 
 } from './components/icons';
 
 const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null, visible: boolean }> = ({ position, visible }) => {
@@ -32,7 +29,7 @@ const AnimatedMalletCursor: React.FC<{ position: { x: number, y: number } | null
 const tools = [
     { id: 'hand', name: '手拍', icon: HandIcon },
     { id: 'mallet', name: '木槌', icon: MalletIcon },
-    { id: 'fistPunch', name: '水泡', icon: FistIcon },
+    { id: 'fistPunch', name: '水泡', icon: BlisterIcon },
     { id: 'voodooSpider', name: '巫毒蜘蛛', icon: SpiderIcon },
     { id: 'voodooNeedle', name: '巫毒针', icon: VoodooNeedleIcon },
     { id: 'shatter', name: '碎裂', icon: CrackIcon },
@@ -1185,13 +1182,13 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
     return (
         <button
             onClick={() => setActiveTool(tool.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 aspect-square ${
-                isActive ? 'bg-yellow-500 text-slate-900 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600/ ৫০'
+            className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200 aspect-square ${
+                isActive ? 'bg-yellow-500 text-slate-900 shadow-lg scale-105' : 'bg-slate-700/50 hover:bg-slate-600/50'
             }`}
             aria-label={tool.name}
         >
-            <tool.icon className="w-6 h-6 mb-1" />
-            <span className="text-xs font-semibold">{tool.name}</span>
+            <tool.icon className="w-8 h-8 mb-2" />
+            <span className="text-sm font-semibold">{tool.name}</span>
         </button>
     );
   };
@@ -1268,7 +1265,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                             <span className="font-bold">{coins}</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-3">
                         {tools.map(tool => <ToolButton key={tool.id} tool={tool} />)}
                     </div>
                     <p className="text-xs text-slate-400 text-center mt-3">所有工具已解锁! 尽情使用!</p>
