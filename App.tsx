@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceBoundingBox, Dent, Spider, Needle, Bruise, Swelling, SlapAnimation } from './types';
 import { detectFace, applyGenerativeImageEffect } from './services/geminiService';
