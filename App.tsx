@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const isDraggingRef = useRef(false);
   const renderInfo = useRef({ offsetX: 0, offsetY: 0, finalWidth: 1, finalHeight: 1 });
   const audioContextRef = useRef<AudioContext | null>(null);
+  const lastTornadoSoundTime = useRef(0);
   
   const nonDestructiveEffectsBackup = useRef<{dents: Dent[], spiders: Spider[], needles: Needle[], bruises: Bruise[], swellings: Swelling[]}>({ dents: [], spiders: [], needles: [], bruises: [], swellings: [] });
 
@@ -742,6 +743,55 @@ const App: React.FC = () => {
     return { x: (mouseX - offsetX) / finalWidth, y: (mouseY - offsetY) / finalHeight, absoluteX: mouseX, absoluteY: mouseY };
   };
   
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+        try {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } catch (e) {
+            console.error("Web Audio API is not supported.", e);
+            return null;
+        }
+    }
+    if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+  
+  const playTornadoSound = useCallback(() => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+
+    const noise = audioContext.createBufferSource();
+    const bufferSize = audioContext.sampleRate * 0.3;
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    noise.buffer = buffer;
+
+    const bandpass = audioContext.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    bandpass.Q.value = 2;
+    bandpass.frequency.setValueAtTime(400, now);
+    bandpass.frequency.exponentialRampToValueAtTime(1500, now + 0.15);
+    bandpass.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.5, now + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+    noise.connect(bandpass);
+    bandpass.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    noise.start(now);
+    noise.stop(now + 0.3);
+  }, [getAudioContext]);
+  
   const applyTornadoEffect = (canvasX: number, canvasY: number) => {
     const offscreenCanvas = offscreenCanvasRef.current;
     if (!offscreenCanvas) return;
@@ -811,12 +861,40 @@ const App: React.FC = () => {
     
     offscreenCtx.putImageData(warpedData, startX, startY);
     setHasDestructiveChanges(true);
+
+    const now = performance.now();
+    if (now - lastTornadoSoundTime.current > 150) {
+        playTornadoSound();
+        lastTornadoSoundTime.current = now;
+    }
     redrawCanvas();
   };
 
+  const playAiSound = useCallback(() => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+
+    const osc = audioContext.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(1600, now + 0.2);
+
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.3, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }, [getAudioContext]);
+  
     const handleAIEffect = async (promptGenerator: (strength: number) => string) => {
         if (!offscreenCanvasRef.current || !imageFile) return;
-
+        
+        playAiSound();
         setIsLoading(true);
         setError(null);
         
@@ -878,18 +956,7 @@ const App: React.FC = () => {
     };
     
   const playSlapSound = useCallback((strength: number) => {
-      if (!audioContextRef.current) {
-          try {
-              audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-          } catch (e) {
-              console.error("Web Audio API is not supported.", e);
-              return;
-          }
-      }
-      const audioContext = audioContextRef.current;
-      if (!audioContext || audioContext.state === 'suspended') {
-          audioContext?.resume();
-      }
+      const audioContext = getAudioContext();
       if (!audioContext) return;
 
       const now = audioContext.currentTime;
@@ -947,7 +1014,143 @@ const App: React.FC = () => {
       crack.start(now);
       
       thump.stop(now + 0.2); // Clean up the oscillator
-  }, []);
+  }, [getAudioContext]);
+  
+  const playMalletSound = useCallback((strength: number) => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+
+      const now = audioContext.currentTime;
+      const s = strength / 100;
+
+      // Wood "thwack" sound
+      const thwack = audioContext.createOscillator();
+      thwack.type = 'square';
+      thwack.frequency.setValueAtTime(300 + s * 100, now);
+      thwack.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+
+      const thwackGain = audioContext.createGain();
+      thwackGain.gain.setValueAtTime(0.5, now);
+      thwackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+      thwack.connect(thwackGain);
+      thwackGain.connect(audioContext.destination);
+
+      // Impact noise
+      const noise = audioContext.createBufferSource();
+      const bufferSize = audioContext.sampleRate * 0.1;
+      const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+          output[i] = (Math.random() * 2 - 1) * 0.3;
+      }
+      noise.buffer = buffer;
+
+      const noiseGain = audioContext.createGain();
+      noiseGain.gain.setValueAtTime(0.4 + s * 0.4, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      
+      const bandpass = audioContext.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.value = 800;
+      bandpass.Q.value = 1.5;
+
+      noise.connect(bandpass);
+      bandpass.connect(noiseGain);
+      noiseGain.connect(audioContext.destination);
+
+      thwack.start(now);
+      noise.start(now);
+      thwack.stop(now + 0.1);
+      noise.stop(now + 0.1);
+  }, [getAudioContext]);
+
+  const playSpiderSound = useCallback(() => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+      const now = audioContext.currentTime;
+
+      for (let i = 0; i < 6; i++) {
+          const noise = audioContext.createBufferSource();
+          const bufferSize = audioContext.sampleRate * 0.03;
+          const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+          const output = buffer.getChannelData(0);
+          for (let j = 0; j < bufferSize; j++) {
+              output[j] = Math.random() * 2 - 1;
+          }
+          noise.buffer = buffer;
+
+          const highpass = audioContext.createBiquadFilter();
+          highpass.type = 'highpass';
+          highpass.frequency.value = 4000 + Math.random() * 2000;
+          
+          const gainNode = audioContext.createGain();
+          gainNode.gain.setValueAtTime(0.1, now + i * 0.04);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.03);
+
+          noise.connect(highpass);
+          highpass.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          noise.start(now + i * 0.04);
+          noise.stop(now + i * 0.04 + 0.03);
+      }
+  }, [getAudioContext]);
+  
+  const playNeedleSound = useCallback(() => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+      const now = audioContext.currentTime;
+
+      const plink = audioContext.createOscillator();
+      plink.type = 'triangle';
+      plink.frequency.setValueAtTime(2500, now);
+      plink.frequency.exponentialRampToValueAtTime(1800, now + 0.2);
+
+      const plinkGain = audioContext.createGain();
+      plinkGain.gain.setValueAtTime(0.3, now);
+      plinkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+      plink.connect(plinkGain);
+      plinkGain.connect(audioContext.destination);
+      
+      plink.start(now);
+      plink.stop(now + 0.2);
+  }, [getAudioContext]);
+
+  const playBruiseSound = useCallback((strength: number) => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+
+      const now = audioContext.currentTime;
+      const s = strength / 100;
+      
+      const noise = audioContext.createBufferSource();
+      const bufferSize = audioContext.sampleRate * 0.15;
+      const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+      }
+      noise.buffer = buffer;
+      
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(1000 + s * 500, now);
+      lowpass.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+      
+      const gainNode = audioContext.createGain();
+      gainNode.gain.setValueAtTime(0.6, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      
+      noise.connect(lowpass);
+      lowpass.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      noise.start(now);
+      noise.stop(now + 0.15);
+  }, [getAudioContext]);
+
 
   const applyToolEffect = (pos: { x: number; y: number; absoluteX: number; absoluteY: number; }) => {
     const ctx = canvasRef.current?.getContext('2d');
@@ -969,6 +1172,7 @@ const App: React.FC = () => {
             shadowColor, highlightColor, createdAt: performance.now(),
         };
         setDents(prevDents => [...prevDents, newDent]);
+        playMalletSound(strength);
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'hand') {
@@ -1013,6 +1217,7 @@ const App: React.FC = () => {
             createdAt: performance.now(),
         };
         setSpiders(prev => [...prev, newSpider]);
+        playSpiderSound();
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'voodooNeedle') {
@@ -1031,6 +1236,7 @@ const App: React.FC = () => {
             color: color,
         };
         setNeedles(prev => [...prev, newNeedle]);
+        playNeedleSound();
         setHitCount(prev => prev + 1);
         setCoins(prev => prev + 5);
     } else if (activeTool === 'fistPunch') {
@@ -1054,6 +1260,7 @@ const App: React.FC = () => {
           });
       }
       setBruises(prev => [...prev, ...newBruises]);
+      playBruiseSound(strength);
       setHitCount(prev => prev + 1);
       setCoins(prev => prev + 5);
     } else if (activeTool === 'shatter') {
