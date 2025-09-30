@@ -21,7 +21,7 @@ This project uses the Gemini API, which requires an API key. To run the project,
 **Troubleshooting for Windows:**
 *   Ensure your file is named exactly `.env.local`. Sometimes, Windows may save it as `.env.local.txt`. You can enable "File name extensions" in File Explorer's "View" options to check this.
 
-**Important:** The API key is embedded into the application during the build process. If you create or change the `.env.local` file, you must stop the development server and restart it, or re-run the build command.
+**Important:** If you create or change the `.env.local` file, you must restart the development server (`npm run dev`) or rebuild the application (`npm run build`) for the changes to take effect.
 
 ## Run Locally (Development)
 
