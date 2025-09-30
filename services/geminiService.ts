@@ -3,17 +3,10 @@ import { FaceBoundingBox } from '../types';
 
 let ai: GoogleGenAI | null = null;
 
-// Fix: Use `process.env.API_KEY` for the API key as per coding guidelines.
-// This also resolves the TypeScript error on `import.meta.env`.
+// The API key is now hardcoded to resolve persistent environment variable issues.
 const getAiClient = (): GoogleGenAI => {
   if (!ai) {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      const detailedError = "Gemini API key not found. Please create a .env.local file and set VITE_GEMINI_API_KEY='YOUR_API_KEY'. Then, restart the server or rebuild the application.";
-      console.error(detailedError);
-      // This shorter error will be caught by App.tsx and displayed in the UI.
-      throw new Error("API key is missing. Please follow the setup instructions in README.md.");
-    }
+    const apiKey = "AIzaSyDocb-wqPkVIG_73ejM5pDJBwmfNLWJmzw";
     ai = new GoogleGenAI({ apiKey });
   }
   return ai;
