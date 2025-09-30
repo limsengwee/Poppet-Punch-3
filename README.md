@@ -8,13 +8,37 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/drive/1bZdSSdDEC4nte1DtgD8RlTNmOsJ-9RQ3
 
-## Run Locally
+## Environment Setup
 
-**Prerequisites:**  Node.js
+This project uses the Gemini API, which requires an API key.
 
+1.  Create a file named `.env.local` in the root of the project.
+2.  Add your API key to this file:
+    ```
+    GEMINI_API_KEY="YOUR_API_KEY_HERE"
+    ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Important:** The API key is loaded during the build process. If you change the key, you will need to rebuild the application.
+
+## Run Locally (Development)
+
+**Prerequisites:** Node.js
+
+1.  Install dependencies:
+    `npm install`
+2.  Run the development server:
+    `npm run dev`
+
+This will start a local server, typically at `http://localhost:3000`.
+
+## Build for Production
+
+1.  Ensure your `.env.local` file is set up correctly with your API key.
+2.  Run the build command:
+    `npm run build`
+3.  This will create a `dist` folder with the optimized, static application files. You can then deploy this folder to any static hosting service.
+
+To test the production build locally, you can use `npm run preview` or another static server like `serve`:
+
+`npm install -g serve`
+`serve -s dist`

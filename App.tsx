@@ -679,15 +679,19 @@ const App: React.FC = () => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async (e) => {
-      const base64String = (e.target?.result as string)?.split(',')[1];
-      if (!base64String) {
-        setError('Could not read image file.');
+      try {
+        const base64String = (e.target?.result as string)?.split(',')[1];
+        if (!base64String) {
+          throw new Error('Could not read image file.');
+        }
+        const detectedFace = await detectFace(base64String, file.type);
+        if (detectedFace) setFaceBox(detectedFace);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred during face detection.');
+        console.error(err);
+      } finally {
         setIsLoading(false);
-        return;
       }
-      const detectedFace = await detectFace(base64String, file.type);
-      if (detectedFace) setFaceBox(detectedFace);
-      setIsLoading(false);
     };
     reader.onerror = () => { setError("Failed to read file."); setIsLoading(false); }
   }, []);
@@ -944,7 +948,8 @@ const App: React.FC = () => {
             }
         } catch (e) {
             console.error(e);
-            setError("An error occurred while applying the AI effect.");
+            const message = e instanceof Error ? e.message : "An error occurred while applying the AI effect.";
+            setError(message);
             // Restore non-destructive effects on error
             setDents(nonDestructiveEffectsBackup.current.dents);
             setSpiders(nonDestructiveEffectsBackup.current.spiders);
@@ -1459,7 +1464,7 @@ CRITICAL INSTRUCTIONS: You MUST perfectly preserve the original background, hair
                                 </p>
                             </div>
                         )}
-                        {error && <div className="absolute bottom-4 left-4 right-4 text-center text-red-400 bg-red-900/50 px-4 py-2 rounded-md z-10">{error}</div>}
+                        {error && <div className="absolute bottom-4 left-4 right-4 text-center text-red-400 bg-red-900/50 px-4 py-2 rounded-md z-10 break-words">{error}</div>}
                     </div>
                 )}
             </div>
