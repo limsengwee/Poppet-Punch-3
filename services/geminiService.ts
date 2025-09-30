@@ -9,8 +9,10 @@ const getAiClient = (): GoogleGenAI => {
   if (!ai) {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      // This error will be caught by App.tsx and displayed in the UI.
-      throw new Error("Gemini API key not found. Please create a .env.local file and set VITE_GEMINI_API_KEY='YOUR_API_KEY'. Then, restart the server or rebuild the application.");
+      const detailedError = "Gemini API key not found. Please create a .env.local file and set VITE_GEMINI_API_KEY='YOUR_API_KEY'. Then, restart the server or rebuild the application.";
+      console.error(detailedError);
+      // This shorter error will be caught by App.tsx and displayed in the UI.
+      throw new Error("API key is missing. Please follow the setup instructions in README.md.");
     }
     ai = new GoogleGenAI({ apiKey });
   }
