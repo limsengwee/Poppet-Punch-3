@@ -10,15 +10,18 @@ View your app in AI Studio: https://ai.studio/apps/drive/1bZdSSdDEC4nte1DtgD8RlT
 
 ## Environment Setup
 
-This project uses the Gemini API, which requires an API key.
+This project uses the Gemini API, which requires an API key. To run the project, you need to provide your key.
 
 1.  Create a file named `.env.local` in the root of the project.
-2.  Add your API key to this file:
+2.  Add your API key to this file using the correct variable name, which must start with `VITE_`:
     ```
-    GEMINI_API_KEY="YOUR_API_KEY_HERE"
+    VITE_GEMINI_API_KEY="YOUR_API_KEY_HERE"
     ```
 
-**Important:** The API key is loaded during the build process. If you change the key, you will need to rebuild the application.
+**Troubleshooting for Windows:**
+*   Ensure your file is named exactly `.env.local`. Sometimes, Windows may save it as `.env.local.txt`. You can enable "File name extensions" in File Explorer's "View" options to check this.
+
+**Important:** The API key is embedded into the application during the build process. If you create or change the `.env.local` file, you must stop the development server and restart it, or re-run the build command.
 
 ## Run Locally (Development)
 
@@ -33,10 +36,10 @@ This will start a local server, typically at `http://localhost:3000`.
 
 ## Build for Production
 
-1.  Ensure your `.env.local` file is set up correctly with your API key.
+1.  Ensure your `.env.local` file is set up correctly with your `VITE_GEMINI_API_KEY`.
 2.  Run the build command:
     `npm run build`
-3.  This will create a `dist` folder with the optimized, static application files. You can then deploy this folder to any static hosting service.
+3.  This creates a `dist` folder with the optimized, static application files. You can deploy this folder to any static hosting service.
 
 To test the production build locally, you can use `npm run preview` or another static server like `serve`:
 

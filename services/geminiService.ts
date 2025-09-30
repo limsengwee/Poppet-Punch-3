@@ -1,15 +1,12 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { FaceBoundingBox } from '../types';
 
-const apiKey = process.env.API_KEY as string;
-
+// Fix: Initialize GoogleGenAI with process.env.API_KEY as per coding guidelines.
+// This resolves the 'import.meta.env' error and adheres to the API key handling requirements.
 let ai: GoogleGenAI | null = null;
 const getAiClient = (): GoogleGenAI => {
-  if (!apiKey) {
-    throw new Error("Gemini API key not configured. Please create a .env.local file with your GEMINI_API_KEY and rebuild the project.");
-  }
   if (!ai) {
-    ai = new GoogleGenAI({ apiKey });
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
   return ai;
 };
